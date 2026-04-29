@@ -134,6 +134,8 @@ pub fn applyFeatures(
     state: *const terminal.RenderState,
     features: []const Feature,
 ) void {
+    self.drawMatrix9180(&state.matrix9180);
+
     for (features) |f| switch (f) {
         .highlight_hyperlinks => self.highlightHyperlinks(
             alloc,
@@ -144,6 +146,146 @@ pub fn applyFeatures(
             state,
         ),
     };
+}
+
+fn drawMatrix9180(
+    self: *Overlay,
+    frame: *const terminal.matrix9180.Frame,
+) void {
+    for (frame.layers.items) |layer| {
+        const channel = switch (layer.id) {
+            1 => Channel.red,
+            2 => Channel.green,
+            3 => Channel.blue,
+            else => continue,
+        };
+
+        var view = std.unicode.Utf8View.init(layer.data) catch continue;
+        var it = view.iterator();
+        var x: i32 = layer.x_offset;
+        var y: i32 = layer.y_offset;
+        while (it.nextCodepoint()) |cp| {
+            switch (cp) {
+                '\n' => {
+                    y += 1;
+                    x = layer.x_offset;
+                },
+
+                else => {
+                    if (cp >= 0x2800 and cp <= 0x28FF) {
+                        self.drawBraillePattern(
+                            x,
+                            y,
+                            @intCast(cp - 0x2800),
+                            channel,
+                        );
+                    }
+                    x += 1;
+                },
+            }
+        }
+    }
+}
+
+const Channel = enum {
+    red,
+    green,
+    blue,
+};
+
+fn drawBraillePattern(
+    self: *Overlay,
+    grid_x: i32,
+    grid_y: i32,
+    pattern: u8,
+    channel: Channel,
+) void {
+    if (pattern == 0) return;
+    if (grid_x < 0 or grid_y < 0) return;
+
+    const cell_x: usize = @intCast(grid_x);
+    const cell_y: usize = @intCast(grid_y);
+    const cols = @divTrunc(@as(usize, @intCast(self.surface.getWidth())), self.cell_size.width);
+    const rows = @divTrunc(@as(usize, @intCast(self.surface.getHeight())), self.cell_size.height);
+    if (cell_x >= cols or cell_y >= rows) return;
+
+    const dot_map = [_][2]u8{
+        .{ 0, 0 },
+        .{ 0, 1 },
+        .{ 0, 2 },
+        .{ 1, 0 },
+        .{ 1, 1 },
+        .{ 1, 2 },
+        .{ 0, 3 },
+        .{ 1, 3 },
+    };
+
+    for (dot_map, 0..) |dot, idx| {
+        if ((pattern & (@as(u8, 1) << @intCast(idx))) == 0) continue;
+        self.drawBrailleDot(cell_x, cell_y, dot[0], dot[1], channel);
+    }
+}
+
+fn drawBrailleDot(
+    self: *Overlay,
+    cell_x: usize,
+    cell_y: usize,
+    dot_col: u8,
+    dot_row: u8,
+    channel: Channel,
+) void {
+    const cell_w = self.cell_size.width;
+    const cell_h = self.cell_size.height;
+    if (cell_w == 0 or cell_h == 0) return;
+
+    const base_x = cell_x * cell_w;
+    const base_y = cell_y * cell_h;
+    const bucket_x0 = base_x + (dot_col * cell_w) / 2;
+    const bucket_x1 = base_x + ((dot_col + 1) * cell_w) / 2;
+    const bucket_y0 = base_y + (dot_row * cell_h) / 4;
+    const bucket_y1 = base_y + ((dot_row + 1) * cell_h) / 4;
+    if (bucket_x0 >= bucket_x1 or bucket_y0 >= bucket_y1) return;
+
+    const bucket_w = bucket_x1 - bucket_x0;
+    const bucket_h = bucket_y1 - bucket_y0;
+    const pad_x = bucket_w / 6;
+    const pad_y = bucket_h / 6;
+    const dot_x0 = bucket_x0 + @min(pad_x, bucket_w - 1);
+    const dot_y0 = bucket_y0 + @min(pad_y, bucket_h - 1);
+    const dot_x1 = bucket_x1 - @min(pad_x, bucket_w - 1);
+    const dot_y1 = bucket_y1 - @min(pad_y, bucket_h - 1);
+    if (dot_x0 >= dot_x1 or dot_y0 >= dot_y1) return;
+
+    self.addChannelRect(dot_x0, dot_y0, dot_x1, dot_y1, channel);
+}
+
+fn addChannelRect(
+    self: *Overlay,
+    x0: usize,
+    y0: usize,
+    x1: usize,
+    y1: usize,
+    channel: Channel,
+) void {
+    const width: usize = @intCast(self.surface.getWidth());
+    const height: usize = @intCast(self.surface.getHeight());
+    const max_x = @min(x1, width);
+    const max_y = @min(y1, height);
+    if (x0 >= max_x or y0 >= max_y) return;
+
+    const buf = self.surface.image_surface_rgba.buf;
+    for (y0..max_y) |y| {
+        for (x0..max_x) |x| {
+            const idx = y * width + x;
+            var px = &buf[idx];
+            switch (channel) {
+                .red => px.r = 255,
+                .green => px.g = 255,
+                .blue => px.b = 255,
+            }
+            px.a = 255;
+        }
+    }
 }
 
 /// Add rectangles around contiguous hyperlinks in the render state.

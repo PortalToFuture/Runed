@@ -160,6 +160,9 @@ pub const Command = union(Key) {
     /// https://uapi-group.org/specifications/specs/osc_context/
     context_signal: parsers.context_signal.Command,
 
+    /// OSC 9180. Matrix9180 layered braille graphics stream.
+    matrix9180: parsers.matrix9180.Command,
+
     pub const SemanticPrompt = parsers.semantic_prompt.Command;
 
     pub const KittyClipboardProtocol = parsers.kitty_clipboard_protocol.OSC;
@@ -193,6 +196,7 @@ pub const Command = union(Key) {
             "kitty_text_sizing",
             "kitty_clipboard_protocol",
             "context_signal",
+            "matrix9180",
         },
     );
 
@@ -326,6 +330,9 @@ pub const Parser = struct {
         @"7",
         @"8",
         @"9",
+        @"91",
+        @"918",
+        @"9180",
         @"30",
         @"300",
         @"3008",
@@ -422,6 +429,7 @@ pub const Parser = struct {
             .kitty_text_sizing,
             .kitty_clipboard_protocol,
             .context_signal,
+            .matrix9180,
             => {},
         }
 
@@ -564,6 +572,27 @@ pub const Parser = struct {
                 '7' => self.state = .@"7",
                 '8' => self.state = .@"8",
                 '9' => self.state = .@"9",
+                else => self.state = .invalid,
+            },
+
+            .@"9" => switch (c) {
+                ';' => self.captureTrailing(.fixed),
+                '1' => self.state = .@"91",
+                else => self.state = .invalid,
+            },
+
+            .@"91" => switch (c) {
+                '8' => self.state = .@"918",
+                else => self.state = .invalid,
+            },
+
+            .@"918" => switch (c) {
+                '0' => self.state = .@"9180",
+                else => self.state = .invalid,
+            },
+
+            .@"9180" => switch (c) {
+                ';' => self.captureTrailing(.allocating),
                 else => self.state = .invalid,
             },
 
@@ -728,7 +757,6 @@ pub const Parser = struct {
             .@"22",
             .@"777",
             .@"8",
-            .@"9",
             => switch (c) {
                 ';' => self.captureTrailing(.fixed),
                 else => self.state = .invalid,
@@ -797,9 +825,13 @@ pub const Parser = struct {
             .@"3",
             .@"30",
             .@"300",
+            .@"91",
+            .@"918",
             => null,
 
             .@"3008" => parsers.context_signal.parse(self, terminator_ch),
+
+            .@"9180" => parsers.matrix9180.parse(self, terminator_ch),
 
             .@"6" => null,
 

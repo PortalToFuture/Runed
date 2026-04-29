@@ -232,6 +232,7 @@ pub const Handler = struct {
             .start_hyperlink => try self.terminal.screens.active.startHyperlink(value.uri, value.id),
             .end_hyperlink => self.terminal.screens.active.endHyperlink(),
             .semantic_prompt => try self.terminal.semanticPrompt(value),
+            .matrix9180 => try self.terminal.matrix9180(value),
             .mouse_shape => self.terminal.mouse_shape = value,
             .color_operation => try self.colorOperation(value.op, &value.requests),
             .kitty_color_report => try self.kittyColorOperation(value),

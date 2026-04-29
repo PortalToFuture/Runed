@@ -332,6 +332,7 @@ pub const StreamHandler = struct {
             .clipboard_contents => try self.clipboardContents(value.kind, value.data),
             .semantic_prompt => try self.semanticPrompt(value),
             .mouse_shape => try self.setMouseShape(value),
+            .matrix9180 => try self.terminal.matrix9180(value),
             .configure_charset => self.configureCharset(value.slot, value.charset),
             .set_attribute => {
                 @branchHint(.likely);

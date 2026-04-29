@@ -2869,10 +2869,8 @@ fn setGtkEnv(config: *const CoreConfig) error{NoSpaceLeft}!void {
         }
 
         if (gtk_version.runtimeAtLeast(4, 16, 0)) {
-            // From gtk 4.16, GDK_DEBUG is split into GDK_DEBUG and GDK_DISABLE.
-            // For the remainder of "why" see the 4.14 comment below.
-            gdk_disable.@"gles-api" = true;
-            gdk_disable.vulkan = true;
+            // Local testing on Hyprland requires letting GTK choose its
+            // own rendering backend instead of forcing GLES/Vulkan off.
             break :environment;
         }
         if (gtk_version.runtimeAtLeast(4, 14, 0)) {
@@ -2912,8 +2910,10 @@ fn setGtkEnv(config: *const CoreConfig) error{NoSpaceLeft}!void {
         }
         try writer.writeByte(0);
         const value = fmt.getWritten();
-        log.warn("setting GDK_DEBUG={s}", .{value[0 .. value.len - 1]});
-        _ = internal_os.setenv("GDK_DEBUG", value[0 .. value.len - 1 :0]);
+        if (value.len > 1) {
+            log.warn("setting GDK_DEBUG={s}", .{value[0 .. value.len - 1]});
+            _ = internal_os.setenv("GDK_DEBUG", value[0 .. value.len - 1 :0]);
+        }
     }
 
     {
@@ -2930,9 +2930,12 @@ fn setGtkEnv(config: *const CoreConfig) error{NoSpaceLeft}!void {
         }
         try writer.writeByte(0);
         const value = fmt.getWritten();
-        log.warn("setting GDK_DISABLE={s}", .{value[0 .. value.len - 1]});
-        _ = internal_os.setenv("GDK_DISABLE", value[0 .. value.len - 1 :0]);
+        if (value.len > 1) {
+            log.warn("setting GDK_DISABLE={s}", .{value[0 .. value.len - 1]});
+            _ = internal_os.setenv("GDK_DISABLE", value[0 .. value.len - 1 :0]);
+        }
     }
+
 }
 
 fn findActiveWindow(data: ?*const anyopaque, _: ?*const anyopaque) callconv(.c) c_int {

@@ -16,6 +16,7 @@ const Screen = @import("Screen.zig");
 const ScreenSet = @import("ScreenSet.zig");
 const Style = @import("style.zig").Style;
 const Terminal = @import("Terminal.zig");
+const matrix9180 = @import("matrix9180.zig");
 
 // Developer note: this is in src/terminal and not src/renderer because
 // the goal is that this remains generic to multiple renderers. This can
@@ -78,6 +79,9 @@ pub const RenderState = struct {
     /// the dirty state.
     dirty: Dirty,
 
+    /// The current Matrix9180 frame to render as an overlay.
+    matrix9180: matrix9180.Frame,
+
     /// The screen type that this state represents. This is used primarily
     /// to detect changes.
     screen: ScreenSet.Key,
@@ -113,6 +117,7 @@ pub const RenderState = struct {
         },
         .row_data = .empty,
         .dirty = .false,
+        .matrix9180 = .empty,
         .screen = .primary,
     };
 
@@ -245,6 +250,7 @@ pub const RenderState = struct {
     };
 
     pub fn deinit(self: *RenderState, alloc: Allocator) void {
+        self.matrix9180.deinit(alloc);
         for (
             self.row_data.items(.arena),
             self.row_data.items(.cells),
@@ -321,6 +327,11 @@ pub const RenderState = struct {
         self.cursor.viewport = null;
 
         // Colors.
+        if (t.flags.dirty.matrix9180) {
+            self.matrix9180.deinit(alloc);
+            self.matrix9180 = try t.matrix9180_frame.clone(alloc);
+        }
+
         self.colors.cursor = t.colors.cursor.get();
         self.colors.palette = t.colors.palette.current;
         bg_fg: {

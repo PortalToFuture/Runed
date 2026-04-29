@@ -577,6 +577,25 @@ const VTEvent = struct {
         md: *Metadata,
         v: anytype,
     ) !void {
+        if (@TypeOf(v) == terminal.matrix9180.Command) {
+            try md.put("tag", try alloc.dupeZ(u8, @tagName(v.tag)));
+            try encodeMetadataSingle(alloc, md, "id", v.id);
+            switch (v.tag) {
+                .layer_start => {
+                    try encodeMetadataSingle(alloc, md, "z_index", v.z_index);
+                },
+                .offset => {
+                    try encodeMetadataSingle(alloc, md, "x_offset", v.x_offset);
+                    try encodeMetadataSingle(alloc, md, "y_offset", v.y_offset);
+                },
+                .data => {
+                    try md.put("data", try alloc.dupeZ(u8, v.payload()));
+                },
+                .layer_end, .frame_end => {},
+            }
+            return;
+        }
+
         switch (@TypeOf(v)) {
             void => {},
             []const u8,

@@ -2241,7 +2241,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
 
             // If we have no features enabled, don't build an overlay.
             // If we had a previous overlay, deallocate it.
-            if (features.len == 0) {
+            if (features.len == 0 and self.terminal_state.matrix9180.layers.items.len == 0) {
                 if (self.overlay) |*old| {
                     old.deinit(alloc);
                     self.overlay = null;

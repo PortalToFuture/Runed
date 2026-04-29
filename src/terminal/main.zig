@@ -16,6 +16,7 @@ pub const focus = @import("focus.zig");
 pub const formatter = @import("formatter.zig");
 pub const highlight = @import("highlight.zig");
 pub const kitty = @import("kitty.zig");
+pub const matrix9180 = @import("matrix9180.zig");
 pub const modes = @import("modes.zig");
 pub const page = @import("page.zig");
 pub const parse_table = @import("parse_table.zig");

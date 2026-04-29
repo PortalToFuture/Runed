@@ -13,6 +13,7 @@ const device_attributes = @import("device_attributes.zig");
 const device_status = @import("device_status.zig");
 const csi = @import("csi.zig");
 const kitty = @import("kitty.zig");
+const matrix9180 = @import("matrix9180.zig");
 const modes = @import("modes.zig");
 const osc = @import("osc.zig");
 const sgr = @import("sgr.zig");
@@ -125,6 +126,7 @@ pub const Action = union(Key) {
     kitty_color_report: kitty.color.OSC,
     color_operation: ColorOperation,
     semantic_prompt: SemanticPrompt,
+    matrix9180: matrix9180.Command,
 
     pub const Key = lib.Enum(
         lib.target,
@@ -222,6 +224,7 @@ pub const Action = union(Key) {
             "kitty_color_report",
             "color_operation",
             "semantic_prompt",
+            "matrix9180",
         },
     );
 
@@ -2028,6 +2031,10 @@ pub fn Stream(comptime H: type) type {
                         .title = v.title,
                         .body = v.body,
                     });
+                },
+
+                .matrix9180 => |v| {
+                    self.handler.vt(.matrix9180, v);
                 },
 
                 .hyperlink_start => |v| {

@@ -18,6 +18,7 @@ const charsets = @import("charsets.zig");
 const csi = @import("csi.zig");
 const hyperlink = @import("hyperlink.zig");
 const kitty = @import("kitty.zig");
+const matrix9180_pkg = @import("matrix9180.zig");
 const osc = @import("osc.zig");
 const point = @import("point.zig");
 const sgr = @import("sgr.zig");
@@ -67,6 +68,10 @@ pwd: std.ArrayList(u8),
 
 /// The title of the terminal as set by escape sequences (e.g. OSC 0/2).
 title: std.ArrayList(u8),
+
+/// Matrix9180 committed frame and in-progress frame.
+matrix9180_frame: matrix9180_pkg.Frame = .empty,
+matrix9180_pending: matrix9180_pkg.Frame = .empty,
 
 /// The color state for this terminal.
 colors: Colors,
@@ -165,6 +170,9 @@ pub const Dirty = packed struct {
 
     /// Set when the pre-edit is modified.
     preedit: bool = false,
+
+    /// Set when the Matrix9180 overlay frame changes.
+    matrix9180: bool = false,
 };
 
 /// Scrolling region is the area of the screen designated where scrolling
@@ -256,6 +264,8 @@ pub fn deinit(self: *Terminal, alloc: Allocator) void {
     self.screens.deinit(alloc);
     self.pwd.deinit(alloc);
     self.title.deinit(alloc);
+    self.matrix9180_frame.deinit(alloc);
+    self.matrix9180_pending.deinit(alloc);
     self.* = undefined;
 }
 
@@ -285,6 +295,23 @@ pub fn vtHandler(self: *Terminal) Stream.Handler {
 /// The general allocator we should use for this terminal.
 pub fn gpa(self: *Terminal) Allocator {
     return self.screens.active.alloc;
+}
+
+pub fn matrix9180(self: *Terminal, cmd: matrix9180_pkg.Command) !void {
+    const finished = try matrix9180_pkg.applyCommand(
+        &self.matrix9180_pending,
+        self.gpa(),
+        cmd,
+    );
+    if (!finished) return;
+
+    var next = try self.matrix9180_pending.clone(self.gpa());
+    errdefer next.deinit(self.gpa());
+
+    self.matrix9180_frame.deinit(self.gpa());
+    self.matrix9180_frame = next;
+    self.matrix9180_pending.clearRetainingCapacity(self.gpa());
+    self.flags.dirty.matrix9180 = true;
 }
 
 /// Print UTF-8 encoded string to the terminal.
