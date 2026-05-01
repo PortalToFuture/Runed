@@ -1,6 +1,6 @@
-# Runed BD
+# Braille-matrix Display
 
-Braille display experiments in Go.
+Braille-matrix display experiments in Go.
 
 The current pass treats UTF-8 Braille glyphs as a terminal pixel surface,
 renders three separate channel layers from the source image in red, green,

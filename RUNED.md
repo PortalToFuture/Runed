@@ -6,7 +6,7 @@ pulling from `upstream` remains straightforward.
 ## Layout
 
 - repository root: Ghostty fork working tree
-- `bd/`: Braille display experiments in Go
+- `bd/`: Braille-matrix display project in Go
 
 ## Git Strategy
 
