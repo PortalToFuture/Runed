@@ -891,6 +891,8 @@ pub fn gtkNgDistResources(
                 .root_source_file = b.path("src/apprt/gtk/build/blueprint.zig"),
                 .target = b.graph.host,
             }),
+            .use_llvm = true,
+            .use_lld = true,
         });
         blueprint_exe.linkLibC();
         blueprint_exe.linkSystemLibrary2("gtk4", dynamic_link_opts);

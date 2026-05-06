@@ -22,6 +22,8 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
             .omit_frame_pointer = false,
             .unwind_tables = .sync,
         }),
+        .use_llvm = true,
+        .use_lld = true,
     });
     build_data_exe.linkLibC();
 
