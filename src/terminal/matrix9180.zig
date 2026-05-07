@@ -84,6 +84,14 @@ pub const Layer = struct {
             .closed = self.closed,
         };
     }
+
+    pub fn rowCount(self: Layer) usize {
+        return countRows(self.data);
+    }
+
+    pub fn maxCols(self: Layer) usize {
+        return countMaxCols(self.data);
+    }
 };
 
 pub const Frame = struct {
@@ -129,6 +137,28 @@ pub const Frame = struct {
         return &self.layers.items[self.layers.items.len - 1];
     }
 };
+
+pub fn countRows(data: []const u8) usize {
+    if (data.len == 0) return 0;
+
+    var rows: usize = 1;
+    for (data) |ch| {
+        if (ch == '\n') rows += 1;
+    }
+
+    return rows;
+}
+
+pub fn countMaxCols(data: []const u8) usize {
+    var rows = std.mem.splitScalar(u8, data, '\n');
+    var max: usize = 0;
+    while (rows.next()) |row| {
+        const cols = std.unicode.utf8CountCodepoints(row) catch row.len;
+        max = @max(max, cols);
+    }
+
+    return max;
+}
 
 pub fn applyCommand(
     frame: *Frame,

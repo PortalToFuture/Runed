@@ -152,6 +152,21 @@ fn drawMatrix9180(
     self: *Overlay,
     frame: *const terminal.matrix9180.Frame,
 ) void {
+    const cols = @divTrunc(@as(usize, @intCast(self.surface.getWidth())), self.cell_size.width);
+    const rows = @divTrunc(@as(usize, @intCast(self.surface.getHeight())), self.cell_size.height);
+    log.debug(
+        "matrix9180 overlay surface={}x{} cell={}x{} grid={}x{} layers={}",
+        .{
+            self.surface.getWidth(),
+            self.surface.getHeight(),
+            self.cell_size.width,
+            self.cell_size.height,
+            cols,
+            rows,
+            frame.layers.items.len,
+        },
+    );
+
     for (frame.layers.items) |layer| {
         const channel = switch (layer.id) {
             1 => Channel.red,
@@ -164,26 +179,57 @@ fn drawMatrix9180(
         var it = view.iterator();
         var x: i32 = layer.x_offset;
         var y: i32 = layer.y_offset;
+        var rendered_cells: usize = 0;
+        var clipped_cells: usize = 0;
+        var newline_count: usize = 0;
+        var max_x: i32 = x;
+        var max_y: i32 = y;
         while (it.nextCodepoint()) |cp| {
             switch (cp) {
                 '\n' => {
+                    newline_count += 1;
                     y += 1;
                     x = layer.x_offset;
+                    max_y = @max(max_y, y);
                 },
 
                 else => {
                     if (cp >= 0x2800 and cp <= 0x28FF) {
-                        self.drawBraillePattern(
+                        if (self.drawBraillePattern(
                             x,
                             y,
                             @intCast(cp - 0x2800),
                             channel,
-                        );
+                        )) {
+                            rendered_cells += 1;
+                        } else {
+                            clipped_cells += 1;
+                        }
                     }
+                    max_x = @max(max_x, x);
+                    max_y = @max(max_y, y);
                     x += 1;
                 },
             }
         }
+
+        log.debug(
+            "matrix9180 overlay layer id={} z={} offset=({}, {}) bytes={} rows={} max_cols={} rendered_cells={} clipped_cells={} newlines={} extent=({}, {})",
+            .{
+                layer.id,
+                layer.z_index,
+                layer.x_offset,
+                layer.y_offset,
+                layer.data.len,
+                layer.rowCount(),
+                layer.maxCols(),
+                rendered_cells,
+                clipped_cells,
+                newline_count,
+                max_x,
+                max_y,
+            },
+        );
     }
 }
 
@@ -199,15 +245,15 @@ fn drawBraillePattern(
     grid_y: i32,
     pattern: u8,
     channel: Channel,
-) void {
-    if (pattern == 0) return;
-    if (grid_x < 0 or grid_y < 0) return;
+) bool {
+    if (pattern == 0) return false;
+    if (grid_x < 0 or grid_y < 0) return false;
 
     const cell_x: usize = @intCast(grid_x);
     const cell_y: usize = @intCast(grid_y);
     const cols = @divTrunc(@as(usize, @intCast(self.surface.getWidth())), self.cell_size.width);
     const rows = @divTrunc(@as(usize, @intCast(self.surface.getHeight())), self.cell_size.height);
-    if (cell_x >= cols or cell_y >= rows) return;
+    if (cell_x >= cols or cell_y >= rows) return false;
 
     const dot_map = [_][2]u8{
         .{ 0, 0 },
@@ -224,6 +270,8 @@ fn drawBraillePattern(
         if ((pattern & (@as(u8, 1) << @intCast(idx))) == 0) continue;
         self.drawBrailleDot(cell_x, cell_y, dot[0], dot[1], channel);
     }
+
+    return true;
 }
 
 fn drawBrailleDot(

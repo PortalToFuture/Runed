@@ -305,6 +305,22 @@ pub fn matrix9180(self: *Terminal, cmd: matrix9180_pkg.Command) !void {
     );
     if (!finished) return;
 
+    for (self.matrix9180_pending.layers.items) |layer| {
+        log.debug(
+            "matrix9180 pending layer id={} z={} offset=({}, {}) bytes={} rows={} max_cols={} closed={}",
+            .{
+                layer.id,
+                layer.z_index,
+                layer.x_offset,
+                layer.y_offset,
+                layer.data.len,
+                layer.rowCount(),
+                layer.maxCols(),
+                layer.closed,
+            },
+        );
+    }
+
     var next = try self.matrix9180_pending.clone(self.gpa());
     errdefer next.deinit(self.gpa());
 
@@ -312,6 +328,7 @@ pub fn matrix9180(self: *Terminal, cmd: matrix9180_pkg.Command) !void {
     self.matrix9180_frame = next;
     self.matrix9180_pending.clearRetainingCapacity(self.gpa());
     self.flags.dirty.matrix9180 = true;
+    log.debug("matrix9180 frame committed layers={}", .{self.matrix9180_frame.layers.items.len});
 }
 
 /// Print UTF-8 encoded string to the terminal.
