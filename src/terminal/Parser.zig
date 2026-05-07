@@ -888,6 +888,32 @@ test "osc: change window title (end in esc)" {
     }
 }
 
+test "osc: matrix9180 multiline payload stays in osc mode" {
+    var p = init();
+    _ = p.next(0x1B);
+    _ = p.next(']');
+    for ("9180;DATA;id=2;⠁⠃\n⠉") |c| {
+        const a = p.next(c);
+        try testing.expect(a[0] == null);
+        try testing.expect(a[1] == null);
+        try testing.expect(a[2] == null);
+    }
+
+    {
+        const a = p.next(0x07);
+        try testing.expect(p.state == .ground);
+        try testing.expect(a[0].? == .osc_dispatch);
+        try testing.expect(a[1] == null);
+        try testing.expect(a[2] == null);
+
+        const cmd = a[0].?.osc_dispatch;
+        try testing.expect(cmd == .matrix9180);
+        try testing.expectEqual(.data, cmd.matrix9180.tag);
+        try testing.expectEqual(@as(i32, 2), cmd.matrix9180.id);
+        try testing.expectEqualStrings("⠁⠃\n⠉", cmd.matrix9180.payload());
+    }
+}
+
 // https://github.com/darrenstarr/VtNetCore/pull/14
 // Saw this on HN, decided to add a test case because why not.
 test "osc: 112 incomplete sequence" {

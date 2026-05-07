@@ -332,6 +332,10 @@ fn genTable() Table {
         single(&result, 0x19, source, source, .ignore);
         range(&result, 0, 0x06, source, source, .ignore);
         range(&result, 0x08, 0x17, source, source, .ignore);
+        // Preserve embedded line breaks inside OSC payloads. Matrix9180
+        // uses multiline DATA bodies and expects LF/CR to survive capture.
+        single(&result, 0x0A, source, source, .osc_put);
+        single(&result, 0x0D, source, source, .osc_put);
         range(&result, 0x1C, 0x1F, source, source, .ignore);
         range(&result, 0x20, 0xFF, source, source, .osc_put);
 
