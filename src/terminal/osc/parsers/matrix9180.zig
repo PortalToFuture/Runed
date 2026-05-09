@@ -51,6 +51,7 @@ fn parseCommand(data: []const u8) ?Command {
         return .initLayerStart(
             readRequiredInt(rest, "id") orelse return null,
             readRequiredInt(rest, "z") orelse return null,
+            readOptionalAlpha(rest, "alpha"),
         );
     }
 
@@ -91,18 +92,31 @@ fn readRequiredInt(raw: []const u8, key: []const u8) ?i32 {
     return null;
 }
 
+fn readOptionalAlpha(raw: []const u8, key: []const u8) u8 {
+    var it = std.mem.splitScalar(u8, raw, ';');
+    while (it.next()) |field| {
+        const eql = std.mem.indexOfScalar(u8, field, '=') orelse continue;
+        if (!std.mem.eql(u8, field[0..eql], key)) continue;
+        const value = std.fmt.parseInt(u16, field[eql + 1 ..], 10) catch return 255;
+        return @intCast(@min(value, 255));
+    }
+
+    return 255;
+}
+
 test "OSC 9180: layer start" {
     const testing = std.testing;
     var p: Parser = .init(testing.allocator);
     defer p.deinit();
 
-    for ("9180;LAYER_START;id=1;z=10") |ch| p.next(ch);
+    for ("9180;LAYER_START;id=1;z=10;alpha=192") |ch| p.next(ch);
 
     const cmd = p.end(0x07).?.*;
     try testing.expect(cmd == .matrix9180);
     try testing.expectEqual(.layer_start, cmd.matrix9180.tag);
     try testing.expectEqual(@as(i32, 1), cmd.matrix9180.id);
     try testing.expectEqual(@as(i32, 10), cmd.matrix9180.z_index);
+    try testing.expectEqual(@as(u8, 192), cmd.matrix9180.alpha);
 }
 
 test "OSC 9180: data payload" {

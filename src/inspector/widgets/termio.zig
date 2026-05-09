@@ -583,6 +583,7 @@ const VTEvent = struct {
             switch (v.tag) {
                 .layer_start => {
                     try encodeMetadataSingle(alloc, md, "z_index", v.z_index);
+                    try encodeMetadataSingle(alloc, md, "alpha", v.alpha);
                 },
                 .offset => {
                     try encodeMetadataSingle(alloc, md, "x_offset", v.x_offset);

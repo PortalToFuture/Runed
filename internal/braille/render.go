@@ -49,6 +49,7 @@ type LayerPayload struct {
 	ZIndex  int
 	XOffset int
 	YOffset int
+	Alpha   uint8
 	Data    string
 }
 
@@ -88,6 +89,7 @@ func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
 			ZIndex:  spec.zIndex,
 			XOffset: spec.xOffset,
 			YOffset: spec.yOffset,
+			Alpha:   192,
 			Data:    encode(grid, opts),
 		})
 	}

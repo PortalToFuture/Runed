@@ -14,7 +14,7 @@ const (
 
 func WriteFrame(w io.Writer, layers []braille.LayerPayload) error {
 	for _, layer := range layers {
-		if err := writeCommand(w, "LAYER_START;id=%d;z=%d", layer.ID, layer.ZIndex); err != nil {
+		if err := writeCommand(w, "LAYER_START;id=%d;z=%d;alpha=%d", layer.ID, layer.ZIndex, layer.Alpha); err != nil {
 			return err
 		}
 		if err := writeCommand(w, "OFFSET;id=%d;x=%d;y=%d", layer.ID, layer.XOffset, layer.YOffset); err != nil {

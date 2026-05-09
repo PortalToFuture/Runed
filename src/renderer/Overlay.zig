@@ -202,6 +202,7 @@ fn drawMatrix9180(
                             y,
                             @intCast(cp - 0x2800),
                             channel,
+                            layer.alpha,
                         )) {
                             rendered_cells += 1;
                         } else {
@@ -247,6 +248,7 @@ fn drawBraillePattern(
     grid_y: i32,
     pattern: u8,
     channel: Channel,
+    alpha: u8,
 ) bool {
     if (pattern == 0) return false;
     if (grid_x < 0 or grid_y < 0) return false;
@@ -270,7 +272,7 @@ fn drawBraillePattern(
 
     for (dot_map, 0..) |dot, idx| {
         if ((pattern & (@as(u8, 1) << @intCast(idx))) == 0) continue;
-        self.drawBrailleDot(cell_x, cell_y, dot[0], dot[1], channel);
+        self.drawBrailleDot(cell_x, cell_y, dot[0], dot[1], channel, alpha);
     }
 
     return true;
@@ -283,6 +285,7 @@ fn drawBrailleDot(
     dot_col: u8,
     dot_row: u8,
     channel: Channel,
+    alpha: u8,
 ) void {
     const cell_w = self.cell_size.width;
     const cell_h = self.cell_size.height;
@@ -306,7 +309,7 @@ fn drawBrailleDot(
     const dot_y1 = bucket_y1 - @min(pad_y, bucket_h - 1);
     if (dot_x0 >= dot_x1 or dot_y0 >= dot_y1) return;
 
-    self.addChannelDot(dot_x0, dot_y0, dot_x1, dot_y1, channel);
+    self.addChannelDot(dot_x0, dot_y0, dot_x1, dot_y1, channel, alpha);
 }
 
 fn addChannelDot(
@@ -316,6 +319,7 @@ fn addChannelDot(
     x1: usize,
     y1: usize,
     channel: Channel,
+    alpha: u8,
 ) void {
     const width: usize = @intCast(self.surface.getWidth());
     const height: usize = @intCast(self.surface.getHeight());
@@ -341,7 +345,9 @@ fn addChannelDot(
             const coverage = smoothstep(1.0, matrix9180_dot_edge_feather, dist);
             if (coverage <= 0) continue;
 
-            const contribution = @as(u8, @intFromFloat(@round(@as(f32, matrix9180_dot_peak) * coverage)));
+            const scaled_peak = @as(f32, @floatFromInt(matrix9180_dot_peak)) *
+                (@as(f32, @floatFromInt(alpha)) / 255.0);
+            const contribution = @as(u8, @intFromFloat(@round(scaled_peak * coverage)));
             if (contribution == 0) continue;
 
             const idx = y * width + x;

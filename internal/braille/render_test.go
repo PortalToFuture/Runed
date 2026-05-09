@@ -88,6 +88,9 @@ func TestRenderLayersOutputsFixedRGBMetadata(t *testing.T) {
 		if layer.XOffset != want.xOffset || layer.YOffset != want.yOffset {
 			t.Fatalf("layer[%d] offsets = %+v", i, layer)
 		}
+		if layer.Alpha != 192 {
+			t.Fatalf("layer[%d] alpha = %d, want 192", i, layer.Alpha)
+		}
 		if layer.Data != want.data {
 			t.Fatalf("layer[%d] data = %q, want %q", i, layer.Data, want.data)
 		}

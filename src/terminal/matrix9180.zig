@@ -6,6 +6,7 @@ pub const Command = extern struct {
     tag: Tag,
     id: i32 = 0,
     z_index: i32 = 0,
+    alpha: u8 = 255,
     x_offset: i32 = 0,
     y_offset: i32 = 0,
     payload_ptr: [*]const u8 = undefined,
@@ -19,11 +20,12 @@ pub const Command = extern struct {
         frame_end,
     };
 
-    pub fn initLayerStart(id: i32, z_index: i32) Command {
+    pub fn initLayerStart(id: i32, z_index: i32, alpha: u8) Command {
         return .{
             .tag = .layer_start,
             .id = id,
             .z_index = z_index,
+            .alpha = alpha,
         };
     }
 
@@ -64,6 +66,7 @@ pub const Command = extern struct {
 pub const Layer = struct {
     id: i32,
     z_index: i32 = 0,
+    alpha: u8 = 255,
     x_offset: i32 = 0,
     y_offset: i32 = 0,
     data: []u8 = &.{},
@@ -78,6 +81,7 @@ pub const Layer = struct {
         return .{
             .id = self.id,
             .z_index = self.z_index,
+            .alpha = self.alpha,
             .x_offset = self.x_offset,
             .y_offset = self.y_offset,
             .data = try alloc.dupe(u8, self.data),
@@ -174,6 +178,7 @@ pub fn applyCommand(
             }
 
             layer.z_index = cmd.z_index;
+            layer.alpha = cmd.alpha;
             layer.x_offset = 0;
             layer.y_offset = 0;
             layer.closed = false;
@@ -210,7 +215,7 @@ test "matrix9180 frame lifecycle" {
     var frame: Frame = .empty;
     defer frame.deinit(testing.allocator);
 
-    try testing.expect(!(try applyCommand(&frame, testing.allocator, .initLayerStart(1, 10))));
+    try testing.expect(!(try applyCommand(&frame, testing.allocator, .initLayerStart(1, 10, 192))));
     try testing.expect(!(try applyCommand(&frame, testing.allocator, .initOffset(1, -1, 2))));
     try testing.expect(!(try applyCommand(&frame, testing.allocator, .initData(1, "abc"))));
     try testing.expect(!(try applyCommand(&frame, testing.allocator, .initLayerEnd(1))));
@@ -220,6 +225,7 @@ test "matrix9180 frame lifecycle" {
     const layer = frame.layers.items[0];
     try testing.expectEqual(@as(i32, 1), layer.id);
     try testing.expectEqual(@as(i32, 10), layer.z_index);
+    try testing.expectEqual(@as(u8, 192), layer.alpha);
     try testing.expectEqual(@as(i32, -1), layer.x_offset);
     try testing.expectEqual(@as(i32, 2), layer.y_offset);
     try testing.expectEqualStrings("abc", layer.data);
@@ -232,12 +238,13 @@ test "matrix9180 frame clone" {
     var frame: Frame = .empty;
     defer frame.deinit(testing.allocator);
 
-    _ = try applyCommand(&frame, testing.allocator, .initLayerStart(2, 11));
+    _ = try applyCommand(&frame, testing.allocator, .initLayerStart(2, 11, 144));
     _ = try applyCommand(&frame, testing.allocator, .initData(2, "payload"));
 
     var clone = try frame.clone(testing.allocator);
     defer clone.deinit(testing.allocator);
 
     try testing.expectEqual(@as(usize, 1), clone.layers.items.len);
+    try testing.expectEqual(@as(u8, 144), clone.layers.items[0].alpha);
     try testing.expectEqualStrings("payload", clone.layers.items[0].data);
 }
