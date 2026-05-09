@@ -22,6 +22,8 @@ const CellSize = size.CellSize;
 const Image = @import("image.zig").Image;
 
 const log = std.log.scoped(.renderer_overlay);
+const matrix9180_dot_peak: u8 = 176;
+const matrix9180_dot_edge_feather = 0.78;
 
 /// The colors we use for overlays.
 pub const Color = enum {
@@ -304,10 +306,10 @@ fn drawBrailleDot(
     const dot_y1 = bucket_y1 - @min(pad_y, bucket_h - 1);
     if (dot_x0 >= dot_x1 or dot_y0 >= dot_y1) return;
 
-    self.addChannelRect(dot_x0, dot_y0, dot_x1, dot_y1, channel);
+    self.addChannelDot(dot_x0, dot_y0, dot_x1, dot_y1, channel);
 }
 
-fn addChannelRect(
+fn addChannelDot(
     self: *Overlay,
     x0: usize,
     y0: usize,
@@ -322,18 +324,51 @@ fn addChannelRect(
     if (x0 >= max_x or y0 >= max_y) return;
 
     const buf = self.surface.image_surface_rgba.buf;
+    const span_w = @as(f32, @floatFromInt(max_x - x0));
+    const span_h = @as(f32, @floatFromInt(max_y - y0));
+    const center_x = @as(f32, @floatFromInt(x0)) + span_w / 2;
+    const center_y = @as(f32, @floatFromInt(y0)) + span_h / 2;
+    const radius_x = @max(span_w / 2, 0.5);
+    const radius_y = @max(span_h / 2, 0.5);
+
     for (y0..max_y) |y| {
         for (x0..max_x) |x| {
+            const px_center_x = @as(f32, @floatFromInt(x)) + 0.5;
+            const px_center_y = @as(f32, @floatFromInt(y)) + 0.5;
+            const norm_x = (px_center_x - center_x) / radius_x;
+            const norm_y = (px_center_y - center_y) / radius_y;
+            const dist = @sqrt(norm_x * norm_x + norm_y * norm_y);
+            const coverage = smoothstep(1.0, matrix9180_dot_edge_feather, dist);
+            if (coverage <= 0) continue;
+
+            const contribution = @as(u8, @intFromFloat(@round(@as(f32, matrix9180_dot_peak) * coverage)));
+            if (contribution == 0) continue;
+
             const idx = y * width + x;
             var px = &buf[idx];
             switch (channel) {
-                .red => px.r = 255,
-                .green => px.g = 255,
-                .blue => px.b = 255,
+                .red => px.r = saturatingAdd(px.r, contribution),
+                .green => px.g = saturatingAdd(px.g, contribution),
+                .blue => px.b = saturatingAdd(px.b, contribution),
             }
-            px.a = 255;
+            px.a = @max(px.a, @max(px.r, @max(px.g, px.b)));
         }
     }
+}
+
+fn smoothstep(edge0: f32, edge1: f32, x: f32) f32 {
+    if (edge0 == edge1) return if (x < edge0) 0 else 1;
+
+    const low = @min(edge0, edge1);
+    const high = @max(edge0, edge1);
+    const t = std.math.clamp((x - low) / (high - low), 0, 1);
+    const curve = t * t * (3 - 2 * t);
+    return if (edge0 < edge1) curve else 1 - curve;
+}
+
+fn saturatingAdd(a: u8, b: u8) u8 {
+    const sum: u16 = @as(u16, a) + @as(u16, b);
+    return @intCast(@min(sum, std.math.maxInt(u8)));
 }
 
 /// Add rectangles around contiguous hyperlinks in the render state.

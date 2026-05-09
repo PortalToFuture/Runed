@@ -4,6 +4,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"math"
 	"strings"
 )
 
@@ -14,6 +15,13 @@ var dotBits = [4][2]rune{
 	{0x02, 0x10},
 	{0x04, 0x20},
 	{0x40, 0x80},
+}
+
+var ditherRanks = [4][2]uint8{
+	{0, 4},
+	{6, 2},
+	{3, 7},
+	{5, 1},
 }
 
 var defaultLayerSpecs = []struct {
@@ -29,9 +37,11 @@ var defaultLayerSpecs = []struct {
 }
 
 type Options struct {
-	TargetWidth int
-	Threshold   uint8
-	Invert      bool
+	TargetWidth      int
+	ResolutionScale  int
+	SupersampleScale int
+	Threshold        uint8
+	Invert           bool
 }
 
 type LayerPayload struct {
@@ -64,6 +74,7 @@ func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
 	if targetWidth <= 0 {
 		targetWidth = bounds.Dx()
 	}
+	targetWidth *= resolveResolutionScale(opts.ResolutionScale)
 	targetWidth = roundUp(targetWidth, 2)
 
 	targetHeight := scaleHeight(bounds.Dx(), bounds.Dy(), targetWidth)
@@ -71,7 +82,7 @@ func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
 
 	layers := make([]LayerPayload, 0, len(defaultLayerSpecs))
 	for _, spec := range defaultLayerSpecs {
-		grid := rasterize(src, targetWidth, targetHeight, spec.channel)
+		grid := rasterize(src, targetWidth, targetHeight, spec.channel, opts)
 		layers = append(layers, LayerPayload{
 			ID:      spec.id,
 			ZIndex:  spec.zIndex,
@@ -99,7 +110,7 @@ func encode(grid [][]uint8, opts Options) string {
 			var mask rune
 			for y := 0; y < 4; y++ {
 				for x := 0; x < 2; x++ {
-					if active(grid[cellY+y][cellX+x], opts) {
+					if active(grid[cellY+y][cellX+x], x, y, opts) {
 						mask |= dotBits[y][x]
 					}
 				}
@@ -114,29 +125,67 @@ func encode(grid [][]uint8, opts Options) string {
 	return b.String()
 }
 
-func active(value uint8, opts Options) bool {
-	on := value >= opts.Threshold
+func active(value uint8, x, y int, opts Options) bool {
+	level := int(value) + 128 - int(opts.Threshold)
+	if level < 0 {
+		level = 0
+	} else if level > 255 {
+		level = 255
+	}
+
+	on := level > ditherThreshold(x, y)
 	if opts.Invert {
 		return !on
 	}
 	return on
 }
 
-func rasterize(src image.Image, width, height int, c channel) [][]uint8 {
+func ditherThreshold(x, y int) int {
+	rank := int(ditherRanks[y][x])
+	return rank * 255 / 8
+}
+
+func rasterize(src image.Image, width, height int, c channel, opts Options) [][]uint8 {
 	grid := make([][]uint8, height)
 	bounds := src.Bounds()
+	supersample := resolveSupersampleScale(opts.SupersampleScale)
 
 	for y := 0; y < height; y++ {
 		row := make([]uint8, width)
-		srcY := bounds.Min.Y + y*bounds.Dy()/height
 		for x := 0; x < width; x++ {
-			srcX := bounds.Min.X + x*bounds.Dx()/width
-			row[x] = component(src.At(srcX, srcY), c)
+			row[x] = sampleComponent(src, bounds, width, height, x, y, c, supersample)
 		}
 		grid[y] = row
 	}
 
 	return grid
+}
+
+func sampleComponent(
+	src image.Image,
+	bounds image.Rectangle,
+	width, height, x, y int,
+	componentID channel,
+	supersample int,
+) uint8 {
+	cellWidth := float64(bounds.Dx()) / float64(width)
+	cellHeight := float64(bounds.Dy()) / float64(height)
+	startX := float64(bounds.Min.X) + float64(x)*cellWidth
+	startY := float64(bounds.Min.Y) + float64(y)*cellHeight
+
+	var total float64
+	sampleCount := supersample * supersample
+	for sampleY := 0; sampleY < supersample; sampleY++ {
+		py := startY + (float64(sampleY)+0.5)*cellHeight/float64(supersample)
+		srcY := clampCoordinate(int(math.Floor(py)), bounds.Min.Y, bounds.Max.Y-1)
+		for sampleX := 0; sampleX < supersample; sampleX++ {
+			px := startX + (float64(sampleX)+0.5)*cellWidth/float64(supersample)
+			srcX := clampCoordinate(int(math.Floor(px)), bounds.Min.X, bounds.Max.X-1)
+			total += float64(component(src.At(srcX, srcY), componentID))
+		}
+	}
+
+	return uint8(math.Round(total / float64(sampleCount)))
 }
 
 func component(c color.Color, component channel) uint8 {
@@ -158,4 +207,28 @@ func roundUp(value, multiple int) int {
 		return value
 	}
 	return value + multiple - value%multiple
+}
+
+func resolveResolutionScale(scale int) int {
+	if scale <= 0 {
+		return 1
+	}
+	return scale
+}
+
+func resolveSupersampleScale(scale int) int {
+	if scale <= 0 {
+		return 2
+	}
+	return scale
+}
+
+func clampCoordinate(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

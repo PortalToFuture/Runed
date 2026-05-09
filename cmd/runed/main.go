@@ -15,9 +15,11 @@ import (
 
 func main() {
 	var (
-		width     = flag.Int("width", 96, "target output width in pixels; rounded to a multiple of 2")
-		threshold = flag.Uint("threshold", 128, "channel threshold from 0-255")
-		invert    = flag.Bool("invert", false, "invert the channel threshold test")
+		width       = flag.Int("width", 96, "base output width in pixels before braille packing; rounded to a multiple of 2")
+		matrixScale = flag.Int("matrix-scale", 2, "multiplier for the braille matrix resolution before packing")
+		supersample = flag.Int("supersample", 2, "box-filter samples per output axis when rasterizing each braille dot")
+		threshold   = flag.Uint("threshold", 128, "channel threshold from 0-255")
+		invert      = flag.Bool("invert", false, "invert the channel threshold test")
 	)
 
 	flag.Usage = func() {
@@ -45,9 +47,11 @@ func main() {
 	}
 
 	layers, err := braille.RenderLayers(src, braille.Options{
-		TargetWidth: *width,
-		Threshold:   uint8(*threshold),
-		Invert:      *invert,
+		TargetWidth:      *width,
+		ResolutionScale:  *matrixScale,
+		SupersampleScale: *supersample,
+		Threshold:        uint8(*threshold),
+		Invert:           *invert,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "render braille: %v\n", err)
