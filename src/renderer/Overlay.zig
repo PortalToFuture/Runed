@@ -137,6 +137,11 @@ pub fn applyFeatures(
     features: []const Feature,
 ) void {
     self.drawMatrix9180(&state.matrix9180);
+    if (state.matrix9180.layers.items.len > 0) {
+        self.postProcessMatrix9180(alloc) catch |err| {
+            log.warn("matrix9180 post-process failed: {}", .{err});
+        };
+    }
 
     for (features) |f| switch (f) {
         .highlight_hyperlinks => self.highlightHyperlinks(
@@ -375,6 +380,86 @@ fn smoothstep(edge0: f32, edge1: f32, x: f32) f32 {
 fn saturatingAdd(a: u8, b: u8) u8 {
     const sum: u16 = @as(u16, a) + @as(u16, b);
     return @intCast(@min(sum, std.math.maxInt(u8)));
+}
+
+fn postProcessMatrix9180(self: *Overlay, alloc: Allocator) !void {
+    const width: usize = @intCast(self.surface.getWidth());
+    const height: usize = @intCast(self.surface.getHeight());
+    if (width == 0 or height == 0) return;
+
+    const Pixel = @TypeOf(self.surface.image_surface_rgba.buf[0]);
+    const buf = self.surface.image_surface_rgba.buf;
+    const scratch = try alloc.alloc(Pixel, buf.len);
+    defer alloc.free(scratch);
+
+    @memcpy(scratch, buf);
+
+    for (0..height) |y| {
+        for (0..width) |x| {
+            const orig = scratch[y * width + x];
+            const blur = gaussian3x3(scratch, width, height, x, y);
+
+            var out = &buf[y * width + x];
+            out.r = combineMatrixChannel(orig.r, blur.r);
+            out.g = combineMatrixChannel(orig.g, blur.g);
+            out.b = combineMatrixChannel(orig.b, blur.b);
+            out.a = @max(out.a, @max(out.r, @max(out.g, out.b)));
+        }
+    }
+}
+
+fn gaussian3x3(
+    src: anytype,
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+) @TypeOf(src[0]) {
+    var sum_r: u32 = 0;
+    var sum_g: u32 = 0;
+    var sum_b: u32 = 0;
+    var sum_a: u32 = 0;
+    var total: u32 = 0;
+
+    const kernel = [_][3]u8{
+        .{ 1, 2, 1 },
+        .{ 2, 4, 2 },
+        .{ 1, 2, 1 },
+    };
+
+    inline for (kernel, 0..) |row, ky| {
+        inline for (row, 0..) |weight, kx| {
+            const sample_x = offsetClamped(x, width, kx);
+            const sample_y = offsetClamped(y, height, ky);
+            const px = src[sample_y * width + sample_x];
+            const w: u32 = weight;
+            sum_r += @as(u32, px.r) * w;
+            sum_g += @as(u32, px.g) * w;
+            sum_b += @as(u32, px.b) * w;
+            sum_a += @as(u32, px.a) * w;
+            total += w;
+        }
+    }
+
+    var out = src[0];
+    out.r = @intCast(sum_r / total);
+    out.g = @intCast(sum_g / total);
+    out.b = @intCast(sum_b / total);
+    out.a = @intCast(sum_a / total);
+    return out;
+}
+
+fn offsetClamped(base: usize, limit: usize, kernel_index: usize) usize {
+    const offset: isize = @as(isize, @intCast(kernel_index)) - 1;
+    const sample: isize = @as(isize, @intCast(base)) + offset;
+    if (sample < 0) return 0;
+    if (sample >= @as(isize, @intCast(limit))) return limit - 1;
+    return @intCast(sample);
+}
+
+fn combineMatrixChannel(orig: u8, blur: u8) u8 {
+    const boosted: u32 = (@as(u32, orig) * 3 + @as(u32, blur) * 5) / 4;
+    return @intCast(@min(boosted, std.math.maxInt(u8)));
 }
 
 /// Add rectangles around contiguous hyperlinks in the render state.
