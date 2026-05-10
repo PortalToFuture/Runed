@@ -22,6 +22,7 @@ const CellSize = size.CellSize;
 const Image = @import("image.zig").Image;
 
 const log = std.log.scoped(.renderer_overlay);
+const matrix9180_cell_scale: f32 = 0.5;
 const matrix9180_dot_peak: u8 = 176;
 const matrix9180_dot_edge_feather = 0.78;
 
@@ -159,8 +160,14 @@ fn drawMatrix9180(
     self: *Overlay,
     frame: *const terminal.matrix9180.Frame,
 ) void {
-    const cols = @divTrunc(@as(usize, @intCast(self.surface.getWidth())), self.cell_size.width);
-    const rows = @divTrunc(@as(usize, @intCast(self.surface.getHeight())), self.cell_size.height);
+    const cols = @divTrunc(
+        @as(usize, @intCast(self.surface.getWidth())),
+        matrixCellWidthPixels(self),
+    );
+    const rows = @divTrunc(
+        @as(usize, @intCast(self.surface.getHeight())),
+        matrixCellHeightPixels(self),
+    );
     log.debug(
         "matrix9180 overlay surface={}x{} cell={}x{} grid={}x{} layers={}",
         .{
@@ -260,8 +267,14 @@ fn drawBraillePattern(
 
     const cell_x: usize = @intCast(grid_x);
     const cell_y: usize = @intCast(grid_y);
-    const cols = @divTrunc(@as(usize, @intCast(self.surface.getWidth())), self.cell_size.width);
-    const rows = @divTrunc(@as(usize, @intCast(self.surface.getHeight())), self.cell_size.height);
+    const cols = @divTrunc(
+        @as(usize, @intCast(self.surface.getWidth())),
+        matrixCellWidthPixels(self),
+    );
+    const rows = @divTrunc(
+        @as(usize, @intCast(self.surface.getHeight())),
+        matrixCellHeightPixels(self),
+    );
     if (cell_x >= cols or cell_y >= rows) return false;
 
     const dot_map = [_][2]u8{
@@ -292,16 +305,15 @@ fn drawBrailleDot(
     channel: Channel,
     alpha: u8,
 ) void {
-    const cell_w = self.cell_size.width;
-    const cell_h = self.cell_size.height;
-    if (cell_w == 0 or cell_h == 0) return;
+    const cell_w = matrixCellWidth(self);
+    const cell_h = matrixCellHeight(self);
 
-    const base_x = cell_x * cell_w;
-    const base_y = cell_y * cell_h;
-    const bucket_x0 = base_x + (dot_col * cell_w) / 2;
-    const bucket_x1 = base_x + ((dot_col + 1) * cell_w) / 2;
-    const bucket_y0 = base_y + (dot_row * cell_h) / 4;
-    const bucket_y1 = base_y + ((dot_row + 1) * cell_h) / 4;
+    const base_x = @as(f32, @floatFromInt(cell_x)) * cell_w;
+    const base_y = @as(f32, @floatFromInt(cell_y)) * cell_h;
+    const bucket_x0 = @as(usize, @intFromFloat(@floor(base_x + (@as(f32, @floatFromInt(dot_col)) * cell_w) / 2)));
+    const bucket_x1 = @as(usize, @intFromFloat(@ceil(base_x + (@as(f32, @floatFromInt(dot_col + 1)) * cell_w) / 2)));
+    const bucket_y0 = @as(usize, @intFromFloat(@floor(base_y + (@as(f32, @floatFromInt(dot_row)) * cell_h) / 4)));
+    const bucket_y1 = @as(usize, @intFromFloat(@ceil(base_y + (@as(f32, @floatFromInt(dot_row + 1)) * cell_h) / 4)));
     if (bucket_x0 >= bucket_x1 or bucket_y0 >= bucket_y1) return;
 
     const bucket_w = bucket_x1 - bucket_x0;
@@ -315,6 +327,22 @@ fn drawBrailleDot(
     if (dot_x0 >= dot_x1 or dot_y0 >= dot_y1) return;
 
     self.addChannelDot(dot_x0, dot_y0, dot_x1, dot_y1, channel, alpha);
+}
+
+fn matrixCellWidth(self: *const Overlay) f32 {
+    return @max(@as(f32, @floatFromInt(self.cell_size.width)) * matrix9180_cell_scale, 2.0);
+}
+
+fn matrixCellHeight(self: *const Overlay) f32 {
+    return @max(@as(f32, @floatFromInt(self.cell_size.height)) * matrix9180_cell_scale, 4.0);
+}
+
+fn matrixCellWidthPixels(self: *const Overlay) usize {
+    return @as(usize, @intFromFloat(@ceil(matrixCellWidth(self))));
+}
+
+fn matrixCellHeightPixels(self: *const Overlay) usize {
+    return @as(usize, @intFromFloat(@ceil(matrixCellHeight(self))));
 }
 
 fn addChannelDot(

@@ -37,6 +37,7 @@ var defaultLayerSpecs = []struct {
 }
 
 type Options struct {
+	TargetColumns    int
 	TargetWidth      int
 	ResolutionScale  int
 	SupersampleScale int
@@ -71,12 +72,7 @@ func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
 		return nil, errors.New("image has no pixels")
 	}
 
-	targetWidth := opts.TargetWidth
-	if targetWidth <= 0 {
-		targetWidth = bounds.Dx()
-	}
-	targetWidth *= resolveResolutionScale(opts.ResolutionScale)
-	targetWidth = roundUp(targetWidth, 2)
+	targetWidth := resolveTargetWidth(bounds, opts)
 
 	targetHeight := scaleHeight(bounds.Dx(), bounds.Dy(), targetWidth)
 	targetHeight = roundUp(targetHeight, 4)
@@ -209,6 +205,20 @@ func roundUp(value, multiple int) int {
 		return value
 	}
 	return value + multiple - value%multiple
+}
+
+func resolveTargetWidth(bounds image.Rectangle, opts Options) int {
+	if opts.TargetColumns > 0 {
+		return roundUp(opts.TargetColumns*2, 2)
+	}
+
+	targetWidth := opts.TargetWidth
+	if targetWidth <= 0 {
+		targetWidth = bounds.Dx()
+	}
+
+	targetWidth *= resolveResolutionScale(opts.ResolutionScale)
+	return roundUp(targetWidth, 2)
 }
 
 func resolveResolutionScale(scale int) int {

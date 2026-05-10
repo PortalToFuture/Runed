@@ -120,3 +120,30 @@ func TestRenderLayersResolutionScaleIncreasesMatrixDensity(t *testing.T) {
 		t.Fatalf("scaled red layer = %q, want left-column detail in both rows", got[0].Data)
 	}
 }
+
+func TestRenderLayersTargetColumnsControlsFinalGridWidth(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			src.SetRGBA(x, y, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+
+	got, err := RenderLayers(src, Options{
+		TargetColumns:   3,
+		TargetWidth:     2,
+		ResolutionScale: 4,
+		Threshold:       128,
+	})
+	if err != nil {
+		t.Fatalf("RenderLayers() error = %v", err)
+	}
+
+	lines := strings.Split(got[0].Data, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("grid rows = %d, want 2 (%q)", len(lines), got[0].Data)
+	}
+	if lines[0] != "⣿⣿⣿" || lines[1] != "⣿⣿⣿" {
+		t.Fatalf("grid rows = %q, want two full rows of %q", got[0].Data, "⣿⣿⣿")
+	}
+}
