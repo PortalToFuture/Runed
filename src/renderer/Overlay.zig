@@ -22,7 +22,8 @@ const CellSize = size.CellSize;
 const Image = @import("image.zig").Image;
 
 const log = std.log.scoped(.renderer_overlay);
-const matrix9180_cell_scale: f32 = 0.5;
+const matrix9180_cell_scale_x: f32 = 0.38;
+const matrix9180_cell_scale_y: f32 = 0.34;
 const matrix9180_dot_peak: u8 = 176;
 const matrix9180_dot_edge_feather = 0.78;
 
@@ -330,11 +331,11 @@ fn drawBrailleDot(
 }
 
 fn matrixCellWidth(self: *const Overlay) f32 {
-    return @max(@as(f32, @floatFromInt(self.cell_size.width)) * matrix9180_cell_scale, 2.0);
+    return @max(@as(f32, @floatFromInt(self.cell_size.width)) * matrix9180_cell_scale_x, 2.0);
 }
 
 fn matrixCellHeight(self: *const Overlay) f32 {
-    return @max(@as(f32, @floatFromInt(self.cell_size.height)) * matrix9180_cell_scale, 4.0);
+    return @max(@as(f32, @floatFromInt(self.cell_size.height)) * matrix9180_cell_scale_y, 4.0);
 }
 
 fn matrixCellWidthPixels(self: *const Overlay) usize {
@@ -425,7 +426,7 @@ fn postProcessMatrix9180(self: *Overlay, alloc: Allocator) !void {
     for (0..height) |y| {
         for (0..width) |x| {
             const orig = scratch[y * width + x];
-            const blur = gaussian3x3(scratch, width, height, x, y);
+            const blur = gaussian5x3(scratch, width, height, x, y);
 
             var out = &buf[y * width + x];
             out.r = combineMatrixChannel(orig.r, blur.r);
@@ -436,7 +437,7 @@ fn postProcessMatrix9180(self: *Overlay, alloc: Allocator) !void {
     }
 }
 
-fn gaussian3x3(
+fn gaussian5x3(
     src: anytype,
     width: usize,
     height: usize,
@@ -452,13 +453,15 @@ fn gaussian3x3(
     const kernel = [_][3]u8{
         .{ 1, 2, 1 },
         .{ 2, 4, 2 },
+        .{ 3, 6, 3 },
+        .{ 2, 4, 2 },
         .{ 1, 2, 1 },
     };
 
     inline for (kernel, 0..) |row, ky| {
         inline for (row, 0..) |weight, kx| {
-            const sample_x = offsetClamped(x, width, kx);
-            const sample_y = offsetClamped(y, height, ky);
+            const sample_x = offsetClamped3(x, width, kx);
+            const sample_y = offsetClamped5(y, height, ky);
             const px = src[sample_y * width + sample_x];
             const w: u32 = weight;
             sum_r += @as(u32, px.r) * w;
@@ -477,7 +480,7 @@ fn gaussian3x3(
     return out;
 }
 
-fn offsetClamped(base: usize, limit: usize, kernel_index: usize) usize {
+fn offsetClamped3(base: usize, limit: usize, kernel_index: usize) usize {
     const offset: isize = @as(isize, @intCast(kernel_index)) - 1;
     const sample: isize = @as(isize, @intCast(base)) + offset;
     if (sample < 0) return 0;
@@ -485,8 +488,16 @@ fn offsetClamped(base: usize, limit: usize, kernel_index: usize) usize {
     return @intCast(sample);
 }
 
+fn offsetClamped5(base: usize, limit: usize, kernel_index: usize) usize {
+    const offset: isize = @as(isize, @intCast(kernel_index)) - 2;
+    const sample: isize = @as(isize, @intCast(base)) + offset;
+    if (sample < 0) return 0;
+    if (sample >= @as(isize, @intCast(limit))) return limit - 1;
+    return @intCast(sample);
+}
+
 fn combineMatrixChannel(orig: u8, blur: u8) u8 {
-    const boosted: u32 = (@as(u32, orig) * 3 + @as(u32, blur) * 5) / 4;
+    const boosted: u32 = (@as(u32, orig) * 2 + @as(u32, blur) * 6) / 4;
     return @intCast(@min(boosted, std.math.maxInt(u8)));
 }
 
