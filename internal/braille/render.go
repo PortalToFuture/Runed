@@ -85,7 +85,7 @@ func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
 			ZIndex:  spec.zIndex,
 			XOffset: spec.xOffset,
 			YOffset: spec.yOffset,
-			Alpha:   192,
+			Alpha:   160,
 			Data:    encode(grid, opts),
 		})
 	}

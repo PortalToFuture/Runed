@@ -24,8 +24,8 @@ const Image = @import("image.zig").Image;
 const log = std.log.scoped(.renderer_overlay);
 const matrix9180_cell_scale_x: f32 = 0.38;
 const matrix9180_cell_scale_y: f32 = 0.34;
-const matrix9180_dot_peak: u8 = 176;
-const matrix9180_dot_edge_feather = 0.78;
+const matrix9180_dot_peak: u8 = 148;
+const matrix9180_dot_edge_feather = 0.74;
 
 /// The colors we use for overlays.
 pub const Color = enum {
@@ -497,7 +497,7 @@ fn offsetClamped5(base: usize, limit: usize, kernel_index: usize) usize {
 }
 
 fn combineMatrixChannel(orig: u8, blur: u8) u8 {
-    const boosted: u32 = (@as(u32, orig) * 2 + @as(u32, blur) * 6) / 4;
+    const boosted: u32 = (@as(u32, orig) * 1 + @as(u32, blur) * 7) / 4;
     return @intCast(@min(boosted, std.math.maxInt(u8)));
 }
 

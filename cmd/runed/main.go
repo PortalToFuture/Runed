@@ -15,9 +15,9 @@ import (
 
 func main() {
 	var (
-		cols        = flag.Int("cols", 128, "final braille grid width in character cells")
-		width       = flag.Int("width", 0, "base output width in pixels before braille packing; ignored when --cols is set")
-		matrixScale = flag.Int("matrix-scale", 1, "multiplier for the braille matrix resolution before packing when using --width")
+		cols        = flag.Int("cols", 300, "final braille grid width in character cells")
+		width       = flag.Int("width", 120, "base output width in pixels before braille packing; ignored when --cols is set")
+		matrixScale = flag.Int("matrix-scale", 2, "multiplier for the braille matrix resolution before packing when using --width")
 		supersample = flag.Int("supersample", 2, "box-filter samples per output axis when rasterizing each braille dot")
 		threshold   = flag.Uint("threshold", 128, "channel threshold from 0-255")
 		invert      = flag.Bool("invert", false, "invert the channel threshold test")
