@@ -31,9 +31,10 @@ var defaultLayerSpecs = []struct {
 	yOffset int
 	channel channel
 }{
-	{id: 1, zIndex: 10, xOffset: 0, yOffset: 0, channel: channelRed},
-	{id: 2, zIndex: 11, xOffset: 0, yOffset: 0, channel: channelGreen},
-	{id: 3, zIndex: 12, xOffset: 0, yOffset: 0, channel: channelBlue},
+	{id: 1, zIndex: 10, xOffset: 0, yOffset: 0, channel: channelCyan},
+	{id: 2, zIndex: 11, xOffset: 0, yOffset: 0, channel: channelMagenta},
+	{id: 3, zIndex: 12, xOffset: 0, yOffset: 0, channel: channelYellow},
+	{id: 4, zIndex: 13, xOffset: 0, yOffset: 0, channel: channelBlack},
 }
 
 type Options struct {
@@ -57,9 +58,10 @@ type LayerPayload struct {
 type channel int
 
 const (
-	channelRed channel = iota
-	channelGreen
-	channelBlue
+	channelCyan channel = iota
+	channelMagenta
+	channelYellow
+	channelBlack
 )
 
 func RenderLayers(src image.Image, opts Options) ([]LayerPayload, error) {
@@ -187,9 +189,55 @@ func sampleComponent(
 }
 
 func component(c color.Color, component channel) uint8 {
-	r, g, b, _ := c.RGBA()
-	values := [3]uint32{uint32(r), uint32(g), uint32(b)}
-	return uint8(values[component] >> 8)
+	values := cmykComponents(color.NRGBAModel.Convert(c).(color.NRGBA))
+	return values[component]
+}
+
+func cmykComponents(c color.NRGBA) [4]uint8 {
+	if c.A == 0 {
+		return [4]uint8{}
+	}
+
+	r := float64(c.R) / 255.0
+	g := float64(c.G) / 255.0
+	b := float64(c.B) / 255.0
+	alpha := float64(c.A) / 255.0
+
+	k := 1.0 - max3(r, g, b)
+	if k >= 1.0 {
+		return [4]uint8{0, 0, 0, uint8(math.Round(alpha * 255.0))}
+	}
+
+	denom := 1.0 - k
+	cyan := (1.0 - r - k) / denom
+	magenta := (1.0 - g - k) / denom
+	yellow := (1.0 - b - k) / denom
+
+	return [4]uint8{
+		scaleChannel(cyan, alpha),
+		scaleChannel(magenta, alpha),
+		scaleChannel(yellow, alpha),
+		scaleChannel(k, alpha),
+	}
+}
+
+func scaleChannel(value, alpha float64) uint8 {
+	if value < 0 {
+		value = 0
+	} else if value > 1 {
+		value = 1
+	}
+	return uint8(math.Round(value * alpha * 255.0))
+}
+
+func max3(a, b, c float64) float64 {
+	if a < b {
+		a = b
+	}
+	if a < c {
+		a = c
+	}
+	return a
 }
 
 func scaleHeight(srcWidth, srcHeight, targetWidth int) int {

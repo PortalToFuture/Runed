@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matrix9180 Viewer</title>
+  <style>
+    :root {
+      --bg: #0f1412;
+      --panel: #171d1a;
+      --panel-2: #1f2824;
+      --line: #304039;
+      --text: #edf4ef;
+      --muted: #9db3a6;
+      --accent: #85f1a8;
+      --danger: #ff8f8f;
+      --cell-size: 22px;
+      --dot-size: 6px;
+      --grid-gap: 1px;
+      --font-ui: "Iosevka Aile", "IBM Plex Sans", sans-serif;
+      --font-mono: "Iosevka Term", "JetBrains Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top, rgba(133, 241, 168, 0.08), transparent 35%),
+        linear-gradient(180deg, #131915 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+    }
+
+    main {
+      width: min(1400px, calc(100vw - 32px));
+      margin: 24px auto;
+      display: grid;
+      grid-template-columns: minmax(320px, 460px) minmax(420px, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    h1, h2, p {
+      margin: 0;
+    }
+
+    h1, h2 {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.95rem;
+    }
+
+    .panel-body {
+      padding: 18px 20px 20px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 420px;
+      resize: vertical;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #0d1210;
+      color: var(--text);
+      padding: 14px;
+      font: 0.9rem/1.45 var(--font-mono);
+    }
+
+    input[type="number"] {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0d1210;
+      color: var(--text);
+      padding: 10px 12px;
+      font: 0.95rem var(--font-mono);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: 600 0.92rem var(--font-ui);
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, #97ffb7, var(--accent));
+      color: #0f1a12;
+      border-color: transparent;
+    }
+
+    button:hover {
+      filter: brightness(1.06);
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.02);
+      font: 0.88rem var(--font-mono);
+    }
+
+    .viewer {
+      display: grid;
+      gap: 18px;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.4fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .surface-wrap {
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+        #0c110f;
+      padding: 16px;
+    }
+
+    .surface-wrap.primary {
+      padding: 18px;
+      background:
+        linear-gradient(180deg, rgba(133, 241, 168, 0.06), transparent),
+        #0c110f;
+    }
+
+    .reference-wrap {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+        #0c110f;
+      padding: 16px;
+    }
+
+    .reference-stage {
+      min-height: 260px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .reference-stage img {
+      display: block;
+      max-width: 100%;
+      max-height: 460px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .reference-empty {
+      color: var(--muted);
+      font: 0.92rem/1.45 var(--font-ui);
+      text-align: center;
+      padding: 20px;
+    }
+
+    .reference-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .reference-controls input[type="file"] {
+      display: none;
+    }
+
+    .file-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: 600 0.92rem var(--font-ui);
+      cursor: pointer;
+    }
+
+    .surface {
+      display: block;
+      width: max-content;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: "DejaVu Sans Mono", "Noto Sans Mono", "Iosevka Term", monospace;
+      font-size: 8px;
+      line-height: 0.78;
+      letter-spacing: 0;
+      white-space: nowrap;
+      font-variant-ligatures: none;
+      text-rendering: optimizeSpeed;
+    }
+
+    .surface-row {
+      display: block;
+      height: 1em;
+    }
+
+    .glyph {
+      display: inline;
+    }
+
+    .layers {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .layer-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      overflow: hidden;
+    }
+
+    .layer-card header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .layer-card .surface-wrap {
+      border: 0;
+      border-radius: 0;
+      padding: 12px;
+      background: transparent;
+    }
+
+    .layer-card strong {
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .error {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 143, 143, 0.28);
+      background: rgba(255, 143, 143, 0.08);
+      color: var(--danger);
+      font: 0.92rem/1.45 var(--font-mono);
+      white-space: pre-wrap;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 1040px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      textarea {
+        min-height: 280px;
+      }
+
+      .compare-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .layers {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="panel-header">
+        <h1>Matrix9180 HTML Viewer</h1>
+        <p class="subtitle">Paste `OSC 9180` payload lines, keep the same `LAYER_START` / `OFFSET` / `DATA` / `LAYER_END` / `FRAME_END` semantics, and validate channel alignment without Ghostty.</p>
+      </div>
+      <div class="panel-body controls">
+        <label>
+          Frame commands
+          <textarea id="commands" spellcheck="false"></textarea>
+        </label>
+
+        <div class="grid-2">
+          <label>
+            Grid columns
+            <input id="cols" type="number" min="1" max="256" value="32">
+          </label>
+          <label>
+            Grid rows
+            <input id="rows" type="number" min="1" max="256" value="18">
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <label>
+            Bloom radius
+            <input id="bloom-radius" type="number" min="0" max="8" step="1" value="1">
+          </label>
+          <label>
+            Bloom intensity
+            <input id="bloom-intensity" type="number" min="0" max="4" step="0.1" value="1.2">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="render" class="primary" type="button">Render Frame</button>
+          <button id="sample-rgb" type="button">Load CMYK Sample</button>
+          <button id="sample-luma" type="button">Load Dense CMYK Sample</button>
+          <button id="clear" type="button">Clear</button>
+        </div>
+
+        <div class="stats" id="stats"></div>
+        <div class="error hidden" id="error"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Composite Surface</h2>
+        <p class="subtitle">Cells are composited by channel id: `1=cyan`, `2=magenta`, `3=yellow`, `4=black`. Layer offsets and line breaks are applied exactly like the current overlay pass.</p>
+      </div>
+      <div class="panel-body viewer">
+        <div class="legend">
+          <span><i class="swatch" style="background:#63e6ff"></i>Layer 1 / cyan</span>
+          <span><i class="swatch" style="background:#ff6cf2"></i>Layer 2 / magenta</span>
+          <span><i class="swatch" style="background:#ffe067"></i>Layer 3 / yellow</span>
+          <span><i class="swatch" style="background:#e5e7eb"></i>Layer 4 / black</span>
+        </div>
+        <div class="compare-grid">
+          <section class="reference-wrap">
+            <div class="reference-stage" id="reference-stage">
+              <div class="reference-empty" id="reference-empty">Load a reference image to compare the source against the braille composite.</div>
+              <img id="reference-image" alt="Reference preview" class="hidden">
+            </div>
+            <div class="reference-controls">
+              <label class="file-button" for="reference-input">Load Reference Image</label>
+              <input id="reference-input" type="file" accept="image/*">
+              <button id="clear-reference" type="button">Clear Reference</button>
+            </div>
+          </section>
+          <div class="surface-wrap primary">
+            <div id="surface" class="surface"></div>
+          </div>
+        </div>
+        <div class="layers">
+          <section class="layer-card">
+            <header>
+              <strong>Layer 1</strong>
+              <span id="layer-meta-1">id=1</span>
+            </header>
+            <div class="surface-wrap">
+              <div id="layer-surface-1" class="surface"></div>
+            </div>
+          </section>
+          <section class="layer-card">
+            <header>
+              <strong>Layer 2</strong>
+              <span id="layer-meta-2">id=2</span>
+            </header>
+            <div class="surface-wrap">
+              <div id="layer-surface-2" class="surface"></div>
+            </div>
+          </section>
+          <section class="layer-card">
+            <header>
+              <strong>Layer 3</strong>
+              <span id="layer-meta-3">id=3</span>
+            </header>
+            <div class="surface-wrap">
+              <div id="layer-surface-3" class="surface"></div>
+            </div>
+          </section>
+          <section class="layer-card">
+            <header>
+              <strong>Layer 4</strong>
+              <span id="layer-meta-4">id=4</span>
+            </header>
+            <div class="surface-wrap">
+              <div id="layer-surface-4" class="surface"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const sampleFrame = [
+      "LAYER_START;id=1;z=10",
+      "OFFSET;id=1;x=2;y=1",
+      "DATA;id=1;⣿⣶⣀",
+      "LAYER_END;id=1",
+      "LAYER_START;id=2;z=11",
+      "OFFSET;id=2;x=2;y=1",
+      "DATA;id=2;⣀⣿⣶",
+      "LAYER_END;id=2",
+      "LAYER_START;id=3;z=12",
+      "OFFSET;id=3;x=2;y=1",
+      "DATA;id=3;⢀⣾⣿",
+      "LAYER_END;id=3",
+      "LAYER_START;id=4;z=13",
+      "OFFSET;id=4;x=3;y=2",
+      "DATA;id=4;⣀⣀⣤",
+      "LAYER_END;id=4",
+      "FRAME_END"
+    ].join("\n");
+
+    const sampleFrameLuma = [
+      "LAYER_START;id=1;z=10",
+      "OFFSET;id=1;x=2;y=1",
+      "DATA;id=1;⢀⣴⣿⣦",
+      "LAYER_END;id=1",
+      "LAYER_START;id=2;z=11",
+      "OFFSET;id=2;x=3;y=1",
+      "DATA;id=2;⣾⣿⣤⡀",
+      "LAYER_END;id=2",
+      "LAYER_START;id=3;z=12",
+      "OFFSET;id=3;x=2;y=1",
+      "DATA;id=3;⣀⣶⣿⣶",
+      "LAYER_END;id=3",
+      "LAYER_START;id=4;z=13",
+      "OFFSET;id=4;x=2;y=1",
+      "DATA;id=4;⢀⣾⣿⣿⣷\n⢸⣿⣶⣶⡇\n⠈⢿⣿⡿⠁",
+      "LAYER_END;id=4",
+      "FRAME_END"
+    ].join("\n");
+
+    const DOT_MAP = [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [1, 0],
+      [1, 1],
+      [1, 2],
+      [0, 3],
+      [1, 3]
+    ];
+
+    const CHANNELS = {
+      1: "c",
+      2: "m",
+      3: "y",
+      4: "k"
+    };
+
+    const commandsEl = document.getElementById("commands");
+    const colsEl = document.getElementById("cols");
+    const rowsEl = document.getElementById("rows");
+    const bloomRadiusEl = document.getElementById("bloom-radius");
+    const bloomIntensityEl = document.getElementById("bloom-intensity");
+    const surfaceEl = document.getElementById("surface");
+    const statsEl = document.getElementById("stats");
+    const errorEl = document.getElementById("error");
+    const referenceInputEl = document.getElementById("reference-input");
+    const referenceImageEl = document.getElementById("reference-image");
+    const referenceEmptyEl = document.getElementById("reference-empty");
+    const layerSurfaceEls = {
+      1: document.getElementById("layer-surface-1"),
+      2: document.getElementById("layer-surface-2"),
+      3: document.getElementById("layer-surface-3"),
+      4: document.getElementById("layer-surface-4")
+    };
+    const layerMetaEls = {
+      1: document.getElementById("layer-meta-1"),
+      2: document.getElementById("layer-meta-2"),
+      3: document.getElementById("layer-meta-3"),
+      4: document.getElementById("layer-meta-4")
+    };
+
+    document.getElementById("sample-rgb").addEventListener("click", () => {
+      commandsEl.value = sampleFrame;
+      render();
+    });
+
+    document.getElementById("sample-luma").addEventListener("click", () => {
+      commandsEl.value = sampleFrameLuma;
+      render();
+    });
+
+    document.getElementById("clear").addEventListener("click", () => {
+      commandsEl.value = "";
+      render();
+    });
+    document.getElementById("clear-reference").addEventListener("click", clearReferenceImage);
+
+    document.getElementById("render").addEventListener("click", render);
+    referenceInputEl.addEventListener("change", handleReferenceImage);
+    commandsEl.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        render();
+      }
+    });
+
+    function handleReferenceImage(event) {
+      const [file] = event.target.files || [];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        referenceImageEl.src = String(reader.result);
+        referenceImageEl.classList.remove("hidden");
+        referenceEmptyEl.classList.add("hidden");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearReferenceImage() {
+      referenceInputEl.value = "";
+      referenceImageEl.removeAttribute("src");
+      referenceImageEl.classList.add("hidden");
+      referenceEmptyEl.classList.remove("hidden");
+    }
+
+    function parseIntField(fields, name, lineNo) {
+      const prefix = name + "=";
+      for (const field of fields) {
+        if (field.startsWith(prefix)) {
+          const value = Number.parseInt(field.slice(prefix.length), 10);
+          if (Number.isNaN(value)) {
+            throw new Error(`line ${lineNo}: invalid integer for ${name}`);
+          }
+          return value;
+        }
+      }
+      throw new Error(`line ${lineNo}: missing ${name}`);
+    }
+
+    function unescapeControlText(raw) {
+      return raw
+        .replace(/\\x1b/g, "\x1b")
+        .replace(/\\x07/g, "\x07")
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t");
+    }
+
+    function extractCommands(raw) {
+      const text = unescapeControlText(raw);
+
+      if (text.includes("\x1b]9180;")) {
+        return text
+          .split("\x1b]9180;")
+          .slice(1)
+          .map((part) => {
+            const end = part.indexOf("\x07");
+            return end === -1 ? part.trim() : part.slice(0, end).trim();
+          })
+          .filter(Boolean);
+      }
+
+      return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    }
+
+    function parseFrame(raw) {
+      const layers = new Map();
+      const lines = extractCommands(raw);
+      let sawFrameEnd = false;
+
+      for (let i = 0; i < lines.length; i += 1) {
+        const lineNo = i + 1;
+        const line = lines[i];
+
+        if (line === "FRAME_END") {
+          sawFrameEnd = true;
+          continue;
+        }
+
+        const firstSep = line.indexOf(";");
+        if (firstSep === -1) {
+          throw new Error(`line ${lineNo}: missing separator`);
+        }
+
+        const op = line.slice(0, firstSep);
+        const rest = line.slice(firstSep + 1);
+
+        if (op === "DATA") {
+          const secondSep = rest.indexOf(";");
+          if (secondSep === -1) {
+            throw new Error(`line ${lineNo}: DATA missing payload separator`);
+          }
+
+          const idPart = rest.slice(0, secondSep);
+          const payload = rest.slice(secondSep + 1);
+          const id = parseIntField([idPart], "id", lineNo);
+          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
+          layer.data = payload;
+          layers.set(id, layer);
+          continue;
+        }
+
+        const fields = rest.split(";");
+
+        if (op === "LAYER_START") {
+          const id = parseIntField(fields, "id", lineNo);
+          const z = parseIntField(fields, "z", lineNo);
+          layers.set(id, { id, z, x: 0, y: 0, data: "", closed: false });
+          continue;
+        }
+
+        if (op === "OFFSET") {
+          const id = parseIntField(fields, "id", lineNo);
+          const x = parseIntField(fields, "x", lineNo);
+          const y = parseIntField(fields, "y", lineNo);
+          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
+          layer.x = x;
+          layer.y = y;
+          layers.set(id, layer);
+          continue;
+        }
+
+        if (op === "LAYER_END") {
+          const id = parseIntField(fields, "id", lineNo);
+          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
+          layer.closed = true;
+          layers.set(id, layer);
+          continue;
+        }
+
+        throw new Error(`line ${lineNo}: unknown op ${op}`);
+      }
+
+      return {
+        sawFrameEnd,
+        layers: [...layers.values()].sort((a, b) => a.z - b.z || a.id - b.id)
+      };
+    }
+
+    function makeGrid(cols, rows) {
+      const cells = [];
+      for (let i = 0; i < cols * rows; i += 1) {
+        cells.push({
+          c: 0,
+          m: 0,
+          y: 0,
+          k: 0,
+          bloom: 0
+        });
+      }
+      return cells;
+    }
+
+    function drawBraille(cells, cols, rows, layer, channelKey) {
+      let x = layer.x;
+      let y = layer.y;
+
+      for (const char of layer.data) {
+        if (char === "\n") {
+          y += 1;
+          x = layer.x;
+          continue;
+        }
+
+        const codePoint = char.codePointAt(0);
+        if (codePoint >= 0x2800 && codePoint <= 0x28FF) {
+          const pattern = codePoint - 0x2800;
+          for (let bit = 0; bit < 8; bit += 1) {
+            if (((pattern >> bit) & 1) === 0) continue;
+
+            const [dx, dy] = DOT_MAP[bit];
+            const cellX = x;
+            const cellY = y;
+            if (cellX < 0 || cellY < 0 || cellX >= cols || cellY >= rows) continue;
+
+            const cell = cells[cellY * cols + cellX];
+            cell[channelKey] |= 1 << bit;
+            cell.mix = true;
+          }
+        }
+
+        x += 1;
+      }
+    }
+
+    function renderSurface(frame, cols, rows) {
+      const cells = makeGrid(cols, rows);
+      for (const layer of frame.layers) {
+        const channelKey = CHANNELS[layer.id];
+        if (!channelKey) continue;
+        drawBraille(cells, cols, rows, layer, channelKey);
+      }
+      return cells;
+    }
+
+    function renderLayerSurface(layer, cols, rows) {
+      const cells = makeGrid(cols, rows);
+      const channelKey = CHANNELS[layer.id];
+      if (channelKey) {
+        drawBraille(cells, cols, rows, layer, channelKey);
+      }
+      return cells;
+    }
+
+    function applyBloom(cells, cols, rows, radius, intensity) {
+      if (radius <= 0 || intensity <= 0) return;
+
+      const sources = [];
+      for (let index = 0; index < cells.length; index += 1) {
+        const cell = cells[index];
+        const chroma =
+          Number(Boolean(cell.c)) +
+          Number(Boolean(cell.m)) +
+          Number(Boolean(cell.y));
+        if (chroma === 0) continue;
+        const x = index % cols;
+        const y = Math.floor(index / cols);
+        const power = Math.min(1, Math.max(0.35, chroma / 3));
+        sources.push({ x, y, power });
+      }
+
+      for (const source of sources) {
+        for (let dy = -radius; dy <= radius; dy += 1) {
+          for (let dx = -radius; dx <= radius; dx += 1) {
+            const x = source.x + dx;
+            const y = source.y + dy;
+            if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
+
+            const dist = Math.hypot(dx, dy);
+            if (dist > radius) continue;
+
+            const falloff = 1 - dist / (radius + 0.0001);
+            if (falloff <= 0) continue;
+
+            const contribution = falloff * intensity * source.power;
+            const cell = cells[y * cols + x];
+            cell.bloom += contribution;
+          }
+        }
+      }
+    }
+
+    function glyphForCell(cell) {
+      const mask = cell.c | cell.m | cell.y | cell.k;
+      return String.fromCodePoint(0x2800 + mask);
+    }
+
+    function colorForCell(cell) {
+      const active = Number(Boolean(cell.c)) + Number(Boolean(cell.m)) + Number(Boolean(cell.y)) + Number(Boolean(cell.k));
+      if (active === 0) {
+        return "rgba(255,255,255,0.14)";
+      }
+
+      const blackDrop = cell.k ? 175 : 0;
+      const bloomBoost = Math.round(Math.min(40, cell.bloom * 24));
+      const r = Math.max(18, Math.min(255, 245 - (cell.c ? 205 : 0) - blackDrop + bloomBoost));
+      const g = Math.max(18, Math.min(255, 245 - (cell.m ? 205 : 0) - blackDrop + bloomBoost));
+      const b = Math.max(18, Math.min(255, 245 - (cell.y ? 205 : 0) - blackDrop + bloomBoost));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function updateStats(frame, cols, rows, cells) {
+      const litCells = cells.filter((cell) => cell.mix).length;
+      const chips = [
+        `layers=${frame.layers.length}`,
+        `frame_end=${frame.sawFrameEnd}`,
+        `grid=${cols}x${rows}`,
+        `lit_cells=${litCells}`,
+        `bloom_radius=${bloomRadiusEl.value}`,
+        `bloom_intensity=${bloomIntensityEl.value}`
+      ];
+
+      statsEl.innerHTML = chips
+        .map((text) => `<span class="chip">${text}</span>`)
+        .join("");
+    }
+
+    function setError(message) {
+      if (!message) {
+        errorEl.textContent = "";
+        errorEl.classList.add("hidden");
+        return;
+      }
+
+      errorEl.textContent = message;
+      errorEl.classList.remove("hidden");
+    }
+
+    function paintSurface(element, cells, cols, rows) {
+      const rowsHtml = [];
+      for (let row = 0; row < rows; row += 1) {
+        const glyphs = [];
+        for (let col = 0; col < cols; col += 1) {
+          const cell = cells[row * cols + col];
+          glyphs.push(`<span class="glyph" style="color:${colorForCell(cell)}">${glyphForCell(cell)}</span>`);
+        }
+        rowsHtml.push(`<div class="surface-row">${glyphs.join("")}</div>`);
+      }
+      element.innerHTML = rowsHtml.join("");
+    }
+
+    function paintLayers(frame, cols, rows) {
+      for (const id of [1, 2, 3, 4]) {
+        const element = layerSurfaceEls[id];
+        const meta = layerMetaEls[id];
+        const layer = frame.layers.find((entry) => entry.id === id);
+
+        if (!layer) {
+          paintSurface(element, makeGrid(cols, rows), cols, rows);
+          meta.textContent = `id=${id} missing`;
+          continue;
+        }
+
+        paintSurface(element, renderLayerSurface(layer, cols, rows), cols, rows);
+        meta.textContent = `z=${layer.z} x=${layer.x} y=${layer.y}`;
+      }
+    }
+
+    function render() {
+      const cols = Number.parseInt(colsEl.value, 10);
+      const rows = Number.parseInt(rowsEl.value, 10);
+      const bloomRadius = Number.parseInt(bloomRadiusEl.value, 10);
+      const bloomIntensity = Number.parseFloat(bloomIntensityEl.value);
+      if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1) {
+        setError("grid dimensions must be positive integers");
+        return;
+      }
+      if (!Number.isInteger(bloomRadius) || bloomRadius < 0) {
+        setError("bloom radius must be a non-negative integer");
+        return;
+      }
+      if (!Number.isFinite(bloomIntensity) || bloomIntensity < 0) {
+        setError("bloom intensity must be a non-negative number");
+        return;
+      }
+
+      try {
+        const frame = parseFrame(commandsEl.value);
+        const cells = renderSurface(frame, cols, rows);
+        applyBloom(cells, cols, rows, bloomRadius, bloomIntensity);
+        paintSurface(surfaceEl, cells, cols, rows);
+        paintLayers(frame, cols, rows);
+        updateStats(frame, cols, rows, cells);
+        setError("");
+      } catch (error) {
+        setError(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    commandsEl.value = sampleFrame;
+    render();
+  </script>
+</body>
+</html>

@@ -27,7 +27,7 @@ func main() {
 		invert      = flag.Bool("invert", false, "invert the channel threshold test")
 		frames      = flag.Int("frames", 1, "number of animation frames to emit for still images")
 		fps         = flag.Float64("fps", 12, "frame rate for multi-frame animation output")
-		revolveFade = flag.Bool("revolve-fade", false, "phase-shift RGB layer alpha to create a revolving fade animation")
+		revolveFade = flag.Bool("revolve-fade", false, "phase-shift CMYK layer alpha to create a revolving fade animation")
 	)
 
 	flag.Usage = func() {
