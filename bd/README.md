@@ -1,5 +1,11 @@
 # Braille-matrix Display
 
+## ELI5 Summary
+
+This little project takes a normal picture and rebuilds it out of Braille characters so a terminal can "draw" it using text. Then it splits the picture into red, green, and blue layers and ships those layers with custom terminal commands, which is basically a clever way of faking graphics in a place that normally only knows about letters.
+
+Right now it is a working experiment with a clear shape: it has a runnable Go CLI, supports still images and GIF frames, emits `OSC 9180` layer data, and even prints a grayscale fallback for terminals that do not understand the new protocol. It is still early-stage, though, since the README calls out simple thresholding and no dithering yet.
+
 Braille-matrix display experiments in Go.
 
 The current pass treats UTF-8 Braille glyphs as a terminal pixel surface,

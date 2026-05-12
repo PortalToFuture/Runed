@@ -21,6 +21,12 @@
   </p>
 </p>
 
+## ELI5 Summary
+
+This repo is doing double duty: it still contains Ghostty, but in your workspace it is also acting like a sandbox for teaching a terminal new visual tricks. The special trick in flight is turning images into layered Braille art and sending it through custom `OSC 9180` escape sequences, so the terminal can behave more like a tiny graphics screen than just a text box.
+
+Right now it reads like an active experiment bench rather than a polished standalone product. The branch is `build/host-helper-llvm-lld`, the latest local commit added Matrix9180 frame animation output, and there are extra local work areas like `ghostty/`, `ghostty-archpkg/`, and generated helper files, so the project is clearly being pushed forward but the top-level README still mostly describes upstream Ghostty instead of the fork's current purpose.
+
 ## About
 
 Ghostty is a terminal emulator that differentiates itself by being
