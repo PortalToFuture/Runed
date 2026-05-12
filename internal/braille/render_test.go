@@ -148,3 +148,18 @@ func TestRenderLayersTargetColumnsControlsFinalGridWidth(t *testing.T) {
 		t.Fatalf("grid rows = %q, want two full rows of %q", got[3].Data, "⣿⣿⣿")
 	}
 }
+
+func TestCMYKComponentsBiasBlackTowardNeutralShadows(t *testing.T) {
+	neutral := cmykComponents(color.NRGBA{R: 96, G: 96, B: 96, A: 255})
+	saturated := cmykComponents(color.NRGBA{R: 96, G: 24, B: 24, A: 255})
+
+	if neutral[3] == 0 {
+		t.Fatalf("neutral gray black plate = %d, want non-zero", neutral[3])
+	}
+	if saturated[3] >= neutral[3] {
+		t.Fatalf("saturated shadow black plate = %d, want less than neutral %d", saturated[3], neutral[3])
+	}
+	if saturated[1] == 0 || saturated[2] == 0 {
+		t.Fatalf("saturated shadow should keep chroma plates, got %v", saturated)
+	}
+}

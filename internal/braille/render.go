@@ -203,7 +203,10 @@ func cmykComponents(c color.NRGBA) [4]uint8 {
 	b := float64(c.B) / 255.0
 	alpha := float64(c.A) / 255.0
 
-	k := 1.0 - max3(r, g, b)
+	maxRGB := max3(r, g, b)
+	minRGB := min3(r, g, b)
+
+	k := 1.0 - maxRGB
 	if k >= 1.0 {
 		return [4]uint8{0, 0, 0, uint8(math.Round(alpha * 255.0))}
 	}
@@ -212,6 +215,14 @@ func cmykComponents(c color.NRGBA) [4]uint8 {
 	cyan := (1.0 - r - k) / denom
 	magenta := (1.0 - g - k) / denom
 	yellow := (1.0 - b - k) / denom
+
+	// Bias the black plate toward neutral shadows so saturated colors keep more
+	// of their character in the terminal preview.
+	saturation := 0.0
+	if maxRGB > 0 {
+		saturation = (maxRGB - minRGB) / maxRGB
+	}
+	k *= 1.0 - 0.75*saturation
 
 	return [4]uint8{
 		scaleChannel(cyan, alpha),
@@ -235,6 +246,16 @@ func max3(a, b, c float64) float64 {
 		a = b
 	}
 	if a < c {
+		a = c
+	}
+	return a
+}
+
+func min3(a, b, c float64) float64 {
+	if a > b {
+		a = b
+	}
+	if a > c {
 		a = c
 	}
 	return a
