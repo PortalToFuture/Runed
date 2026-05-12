@@ -23,9 +23,9 @@
 
 ## ELI5 Summary
 
-This repo is doing double duty: it still contains Ghostty, but in your workspace it is also acting like a sandbox for teaching a terminal new visual tricks. The special trick in flight is turning images into layered Braille art and sending it through custom `OSC 9180` escape sequences, so the terminal can behave more like a tiny graphics screen than just a text box.
+This repo is doing double duty: it still contains Ghostty, but in your workspace it is also acting like a workshop for teaching a terminal new visual tricks. The main trick right now is turning images into layered Braille art and sending those layers through custom `OSC 9180` escape sequences, so the terminal can fake a tiny graphics stack while still speaking text.
 
-Right now it reads like an active experiment bench rather than a polished standalone product. The branch is `build/host-helper-llvm-lld`, the latest local commit added Matrix9180 frame animation output, and there are extra local work areas like `ghostty/`, `ghostty-archpkg/`, and generated helper files, so the project is clearly being pushed forward but the top-level README still mostly describes upstream Ghostty instead of the fork's current purpose.
+Right now it is an active fork with a clear local agenda rather than a polished standalone release. Recent work brought in animated `OSC 9180` frames, switched the Braille renderer from `RGB` to `CMYK` layers, taught the local HTML viewer to respect per-layer alpha, and added a test that keeps the viewer sample stream locked to the real protocol writer. The repo still carries upstream Ghostty as its main history, but the current branch is very much about graphics-oriented terminal experiments.
 
 ## About
 
