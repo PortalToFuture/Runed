@@ -484,19 +484,19 @@
 
   <script>
     const sampleFrame = [
-      "LAYER_START;id=1;z=10",
+      "LAYER_START;id=1;z=10;alpha=160",
       "OFFSET;id=1;x=2;y=1",
       "DATA;id=1;⣿⣶⣀",
       "LAYER_END;id=1",
-      "LAYER_START;id=2;z=11",
+      "LAYER_START;id=2;z=11;alpha=112",
       "OFFSET;id=2;x=2;y=1",
       "DATA;id=2;⣀⣿⣶",
       "LAYER_END;id=2",
-      "LAYER_START;id=3;z=12",
+      "LAYER_START;id=3;z=12;alpha=96",
       "OFFSET;id=3;x=2;y=1",
       "DATA;id=3;⢀⣾⣿",
       "LAYER_END;id=3",
-      "LAYER_START;id=4;z=13",
+      "LAYER_START;id=4;z=13;alpha=72",
       "OFFSET;id=4;x=3;y=2",
       "DATA;id=4;⣀⣀⣤",
       "LAYER_END;id=4",
@@ -504,19 +504,19 @@
     ].join("\n");
 
     const sampleFrameLuma = [
-      "LAYER_START;id=1;z=10",
+      "LAYER_START;id=1;z=10;alpha=160",
       "OFFSET;id=1;x=2;y=1",
       "DATA;id=1;⢀⣴⣿⣦",
       "LAYER_END;id=1",
-      "LAYER_START;id=2;z=11",
+      "LAYER_START;id=2;z=11;alpha=140",
       "OFFSET;id=2;x=3;y=1",
       "DATA;id=2;⣾⣿⣤⡀",
       "LAYER_END;id=2",
-      "LAYER_START;id=3;z=12",
+      "LAYER_START;id=3;z=12;alpha=120",
       "OFFSET;id=3;x=2;y=1",
       "DATA;id=3;⣀⣶⣿⣶",
       "LAYER_END;id=3",
-      "LAYER_START;id=4;z=13",
+      "LAYER_START;id=4;z=13;alpha=96",
       "OFFSET;id=4;x=2;y=1",
       "DATA;id=4;⢀⣾⣿⣿⣷\n⢸⣿⣶⣶⡇\n⠈⢿⣿⡿⠁",
       "LAYER_END;id=4",
@@ -539,6 +539,12 @@
       2: "m",
       3: "y",
       4: "k"
+    };
+    const ALPHA_KEYS = {
+      1: "ca",
+      2: "ma",
+      3: "ya",
+      4: "ka"
     };
 
     const commandsEl = document.getElementById("commands");
@@ -677,41 +683,43 @@
             throw new Error(`line ${lineNo}: DATA missing payload separator`);
           }
 
-          const idPart = rest.slice(0, secondSep);
-          const payload = rest.slice(secondSep + 1);
-          const id = parseIntField([idPart], "id", lineNo);
-          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
-          layer.data = payload;
-          layers.set(id, layer);
-          continue;
+        const idPart = rest.slice(0, secondSep);
+        const payload = rest.slice(secondSep + 1);
+        const id = parseIntField([idPart], "id", lineNo);
+        const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, alpha: 255, data: "", closed: false };
+        layer.data = payload;
+        layers.set(id, layer);
+        continue;
         }
 
         const fields = rest.split(";");
 
-        if (op === "LAYER_START") {
-          const id = parseIntField(fields, "id", lineNo);
-          const z = parseIntField(fields, "z", lineNo);
-          layers.set(id, { id, z, x: 0, y: 0, data: "", closed: false });
-          continue;
-        }
+      if (op === "LAYER_START") {
+        const id = parseIntField(fields, "id", lineNo);
+        const z = parseIntField(fields, "z", lineNo);
+        const alphaField = fields.find((field) => field.startsWith("alpha="));
+        const alpha = alphaField ? parseIntField([alphaField], "alpha", lineNo) : 255;
+        layers.set(id, { id, z, x: 0, y: 0, alpha, data: "", closed: false });
+        continue;
+      }
 
         if (op === "OFFSET") {
           const id = parseIntField(fields, "id", lineNo);
           const x = parseIntField(fields, "x", lineNo);
           const y = parseIntField(fields, "y", lineNo);
-          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
-          layer.x = x;
-          layer.y = y;
-          layers.set(id, layer);
+        const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, alpha: 255, data: "", closed: false };
+        layer.x = x;
+        layer.y = y;
+        layers.set(id, layer);
           continue;
         }
 
         if (op === "LAYER_END") {
           const id = parseIntField(fields, "id", lineNo);
-          const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, data: "", closed: false };
-          layer.closed = true;
-          layers.set(id, layer);
-          continue;
+        const layer = layers.get(id) || { id, z: 0, x: 0, y: 0, alpha: 255, data: "", closed: false };
+        layer.closed = true;
+        layers.set(id, layer);
+        continue;
         }
 
         throw new Error(`line ${lineNo}: unknown op ${op}`);
@@ -731,15 +739,20 @@
           m: 0,
           y: 0,
           k: 0,
+          ca: 0,
+          ma: 0,
+          ya: 0,
+          ka: 0,
           bloom: 0
         });
       }
       return cells;
     }
 
-    function drawBraille(cells, cols, rows, layer, channelKey) {
+    function drawBraille(cells, cols, rows, layer, channelKey, alphaKey) {
       let x = layer.x;
       let y = layer.y;
+      const layerAlpha = Math.max(0, Math.min(255, layer.alpha ?? 255));
 
       for (const char of layer.data) {
         if (char === "\n") {
@@ -761,6 +774,7 @@
 
             const cell = cells[cellY * cols + cellX];
             cell[channelKey] |= 1 << bit;
+            cell[alphaKey] = Math.max(cell[alphaKey], layerAlpha);
             cell.mix = true;
           }
         }
@@ -773,8 +787,9 @@
       const cells = makeGrid(cols, rows);
       for (const layer of frame.layers) {
         const channelKey = CHANNELS[layer.id];
-        if (!channelKey) continue;
-        drawBraille(cells, cols, rows, layer, channelKey);
+        const alphaKey = ALPHA_KEYS[layer.id];
+        if (!channelKey || !alphaKey) continue;
+        drawBraille(cells, cols, rows, layer, channelKey, alphaKey);
       }
       return cells;
     }
@@ -782,8 +797,9 @@
     function renderLayerSurface(layer, cols, rows) {
       const cells = makeGrid(cols, rows);
       const channelKey = CHANNELS[layer.id];
-      if (channelKey) {
-        drawBraille(cells, cols, rows, layer, channelKey);
+      const alphaKey = ALPHA_KEYS[layer.id];
+      if (channelKey && alphaKey) {
+        drawBraille(cells, cols, rows, layer, channelKey, alphaKey);
       }
       return cells;
     }
@@ -794,14 +810,11 @@
       const sources = [];
       for (let index = 0; index < cells.length; index += 1) {
         const cell = cells[index];
-        const chroma =
-          Number(Boolean(cell.c)) +
-          Number(Boolean(cell.m)) +
-          Number(Boolean(cell.y));
+        const chroma = cell.ca + cell.ma + cell.ya;
         if (chroma === 0) continue;
         const x = index % cols;
         const y = Math.floor(index / cols);
-        const power = Math.min(1, Math.max(0.35, chroma / 3));
+        const power = Math.min(1, Math.max(0.2, chroma / (255 * 3)));
         sources.push({ x, y, power });
       }
 
@@ -837,11 +850,15 @@
         return "rgba(255,255,255,0.14)";
       }
 
-      const blackDrop = cell.k ? 175 : 0;
+      const cInk = (cell.ca / 255) * (cell.c ? 1 : 0);
+      const mInk = (cell.ma / 255) * (cell.m ? 1 : 0);
+      const yInk = (cell.ya / 255) * (cell.y ? 1 : 0);
+      const kInk = (cell.ka / 255) * (cell.k ? 1 : 0);
+      const blackDrop = Math.round(175 * kInk);
       const bloomBoost = Math.round(Math.min(40, cell.bloom * 24));
-      const r = Math.max(18, Math.min(255, 245 - (cell.c ? 205 : 0) - blackDrop + bloomBoost));
-      const g = Math.max(18, Math.min(255, 245 - (cell.m ? 205 : 0) - blackDrop + bloomBoost));
-      const b = Math.max(18, Math.min(255, 245 - (cell.y ? 205 : 0) - blackDrop + bloomBoost));
+      const r = Math.max(18, Math.min(255, 245 - Math.round(205 * cInk) - blackDrop + bloomBoost));
+      const g = Math.max(18, Math.min(255, 245 - Math.round(205 * mInk) - blackDrop + bloomBoost));
+      const b = Math.max(18, Math.min(255, 245 - Math.round(205 * yInk) - blackDrop + bloomBoost));
       return `rgb(${r}, ${g}, ${b})`;
     }
 
@@ -898,7 +915,7 @@
         }
 
         paintSurface(element, renderLayerSurface(layer, cols, rows), cols, rows);
-        meta.textContent = `z=${layer.z} x=${layer.x} y=${layer.y}`;
+        meta.textContent = `z=${layer.z} a=${layer.alpha ?? 255} x=${layer.x} y=${layer.y}`;
       }
     }
 
